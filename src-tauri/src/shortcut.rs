@@ -110,6 +110,35 @@ pub fn change_ptt_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn change_auto_accept_changes_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut s = settings::get_settings(&app);
+    s.auto_accept_changes = enabled;
+    settings::write_settings(&app, s);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "auto_accept_changes", "value": enabled }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn change_auto_trigger_min_interval_seconds_setting(
+    app: AppHandle,
+    seconds: u32,
+) -> Result<(), String> {
+    // Clamp to 30–600 seconds as a safety bound
+    let secs = seconds.clamp(30, 600);
+    let mut s = settings::get_settings(&app);
+    s.auto_trigger_min_interval_seconds = secs;
+    settings::write_settings(&app, s);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "auto_trigger_min_interval_seconds", "value": secs }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
 pub fn change_audio_feedback_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.audio_feedback = enabled;
@@ -298,6 +327,134 @@ pub fn change_mute_while_recording_setting(app: AppHandle, enabled: bool) -> Res
     settings.mute_while_recording = enabled;
     settings::write_settings(&app, settings);
 
+    Ok(())
+}
+
+#[tauri::command]
+pub fn change_transcription_chunk_seconds_setting(
+    app: AppHandle,
+    seconds: u32,
+) -> Result<(), String> {
+    // Clamp to a sensible range
+    let secs = seconds.clamp(2, 60);
+    let mut s = settings::get_settings(&app);
+    s.transcription_chunk_seconds = secs;
+    settings::write_settings(&app, s);
+
+    // Notify frontend listeners
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "transcription_chunk_seconds", "value": secs }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn change_meeting_update_interval_seconds_setting(
+    app: AppHandle,
+    seconds: u32,
+) -> Result<(), String> {
+    // Clamp to a sensible range for updates
+    let secs = seconds.clamp(5, 300);
+    let mut s = settings::get_settings(&app);
+    s.meeting_update_interval_seconds = secs;
+    settings::write_settings(&app, s);
+
+    // Notify frontend listeners
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "meeting_update_interval_seconds", "value": secs }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn change_auto_trigger_meeting_command_setting(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut s = settings::get_settings(&app);
+    s.auto_trigger_meeting_command = enabled;
+    settings::write_settings(&app, s);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "auto_trigger_meeting_command", "value": enabled }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn change_github_repo_owner_setting(
+    app: AppHandle,
+    owner: Option<String>,
+) -> Result<(), String> {
+    let mut s = settings::get_settings(&app);
+    s.github_repo_owner = owner.clone();
+    settings::write_settings(&app, s);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "github_repo_owner", "value": owner }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn change_github_repo_name_setting(
+    app: AppHandle,
+    name: Option<String>,
+) -> Result<(), String> {
+    let mut s = settings::get_settings(&app);
+    s.github_repo_name = name.clone();
+    settings::write_settings(&app, s);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "github_repo_name", "value": name }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn change_github_default_branch_setting(
+    app: AppHandle,
+    branch: String,
+) -> Result<(), String> {
+    let mut s = settings::get_settings(&app);
+    s.github_default_branch = branch.clone();
+    settings::write_settings(&app, s);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "github_default_branch", "value": branch }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn change_github_branch_pattern_setting(
+    app: AppHandle,
+    pattern: String,
+) -> Result<(), String> {
+    let mut s = settings::get_settings(&app);
+    s.github_branch_pattern = pattern.clone();
+    settings::write_settings(&app, s);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "github_branch_pattern", "value": pattern }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn change_github_enabled_setting(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut s = settings::get_settings(&app);
+    s.github_enabled = enabled;
+    settings::write_settings(&app, s);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "github_enabled", "value": enabled }),
+    );
     Ok(())
 }
 

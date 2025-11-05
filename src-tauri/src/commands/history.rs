@@ -64,7 +64,7 @@ pub async fn get_audio_file_path(
     // Security: Sanitize filename to prevent path traversal
     let sanitized = sanitize_filename(&file_name)?;
 
-    let path = history_manager.get_audio_file_path(&sanitized)?;
+    let path = history_manager.get_audio_file_path(&sanitized).map_err(|e| e.to_string())?;
     path.to_str()
         .ok_or_else(|| "Invalid file path".to_string())
         .map(|s| s.to_string())

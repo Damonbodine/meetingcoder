@@ -163,6 +163,26 @@ pub struct AppSettings {
     pub clipboard_handling: ClipboardHandling,
     #[serde(default)]
     pub mute_while_recording: bool,
+    #[serde(default = "default_transcription_chunk_seconds")]
+    pub transcription_chunk_seconds: u32,
+    #[serde(default = "default_meeting_update_interval_seconds")]
+    pub meeting_update_interval_seconds: u32,
+    #[serde(default = "default_auto_trigger_meeting_command")]
+    pub auto_trigger_meeting_command: bool,
+    #[serde(default = "default_auto_accept_changes")]
+    pub auto_accept_changes: bool,
+    #[serde(default = "default_auto_trigger_min_interval_seconds")]
+    pub auto_trigger_min_interval_seconds: u32,
+    #[serde(default)]
+    pub github_repo_owner: Option<String>,
+    #[serde(default)]
+    pub github_repo_name: Option<String>,
+    #[serde(default = "default_github_default_branch")]
+    pub github_default_branch: String,
+    #[serde(default = "default_github_branch_pattern")]
+    pub github_branch_pattern: String,
+    #[serde(default = "default_github_enabled")]
+    pub github_enabled: bool,
 }
 
 fn default_model() -> String {
@@ -216,6 +236,26 @@ fn default_sound_theme() -> SoundTheme {
     SoundTheme::Marimba
 }
 
+fn default_transcription_chunk_seconds() -> u32 {
+    10
+}
+
+fn default_meeting_update_interval_seconds() -> u32 {
+    20
+}
+
+fn default_auto_trigger_meeting_command() -> bool { false }
+
+fn default_auto_accept_changes() -> bool { false }
+
+fn default_auto_trigger_min_interval_seconds() -> u32 { 75 }
+
+fn default_github_default_branch() -> String { "main".to_string() }
+
+fn default_github_branch_pattern() -> String { "meeting/{meeting_id}".to_string() }
+
+fn default_github_enabled() -> bool { false }
+
 pub const SETTINGS_STORE_PATH: &str = "settings_store.json";
 
 pub fn get_default_settings() -> AppSettings {
@@ -263,6 +303,16 @@ pub fn get_default_settings() -> AppSettings {
         paste_method: PasteMethod::default(),
         clipboard_handling: ClipboardHandling::default(),
         mute_while_recording: false,
+        transcription_chunk_seconds: default_transcription_chunk_seconds(),
+        meeting_update_interval_seconds: default_meeting_update_interval_seconds(),
+        auto_trigger_meeting_command: default_auto_trigger_meeting_command(),
+        auto_accept_changes: default_auto_accept_changes(),
+        auto_trigger_min_interval_seconds: default_auto_trigger_min_interval_seconds(),
+        github_repo_owner: None,
+        github_repo_name: None,
+        github_default_branch: default_github_default_branch(),
+        github_branch_pattern: default_github_branch_pattern(),
+        github_enabled: default_github_enabled(),
     }
 }
 

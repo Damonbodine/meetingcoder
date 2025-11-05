@@ -1,5 +1,6 @@
 use crate::audio_toolkit::{list_input_devices, vad::SmoothedVad, AudioRecorder, SileroVad};
 use crate::settings::get_settings;
+use crate::system_audio::SendableSystemAudio;
 use crate::utils;
 use log::{debug, info};
 use std::sync::{Arc, Mutex};
@@ -20,6 +21,12 @@ pub enum RecordingState {
 pub enum MicrophoneMode {
     AlwaysOn,
     OnDemand,
+}
+
+#[derive(Clone, Debug)]
+pub enum AudioSource {
+    Microphone,
+    SystemAudio(String), // device_name
 }
 
 /* ──────────────────────────────────────────────────────────────── */
@@ -59,6 +66,11 @@ pub struct AudioRecordingManager {
     is_open: Arc<Mutex<bool>>,
     is_recording: Arc<Mutex<bool>>,
     initial_volume: Arc<Mutex<Option<u8>>>,
+
+    // System audio capture
+    system_audio: Arc<Mutex<Option<SendableSystemAudio>>>,
+    current_source: Arc<Mutex<AudioSource>>,
+    system_audio_buffer: Arc<Mutex<Vec<f32>>>,
 }
 
 impl AudioRecordingManager {
@@ -81,6 +93,10 @@ impl AudioRecordingManager {
             is_open: Arc::new(Mutex::new(false)),
             is_recording: Arc::new(Mutex::new(false)),
             initial_volume: Arc::new(Mutex::new(None)),
+
+            system_audio: Arc::new(Mutex::new(None)),
+            current_source: Arc::new(Mutex::new(AudioSource::Microphone)),
+            system_audio_buffer: Arc::new(Mutex::new(Vec::new())),
         };
 
         // Always-on?  Open immediately.
@@ -313,5 +329,141 @@ impl AudioRecordingManager {
                 self.stop_microphone_stream();
             }
         }
+    }
+
+    /* ---------- system audio support ---------------------------------------- */
+
+    /// Start system audio capture
+    pub fn start_system_audio(&self, device_name: String) -> Result<(), anyhow::Error> {
+        let mut sys_audio = self.system_audio.lock().unwrap();
+
+        // Create system audio capturer if not exists
+        if sys_audio.is_none() {
+            *sys_audio = Some(SendableSystemAudio::new()?);
+        }
+
+        // Start capturing with buffer
+        if let Some(ref capturer) = *sys_audio {
+            let buffer = self.system_audio_buffer.clone();
+            capturer.start_capture(Some(device_name.clone()), buffer)?;
+            info!("System audio capture started from device: {}", device_name);
+        }
+
+        // Update current source
+        *self.current_source.lock().unwrap() = AudioSource::SystemAudio(device_name);
+        *self.is_open.lock().unwrap() = true;
+
+        Ok(())
+    }
+
+    /// Stop system audio capture
+    pub fn stop_system_audio(&self) -> Result<(), anyhow::Error> {
+        let mut sys_audio = self.system_audio.lock().unwrap();
+
+        if let Some(ref mut capturer) = *sys_audio {
+            capturer.stop_capture()?;
+            info!("System audio capture stopped");
+        }
+
+        *self.is_open.lock().unwrap() = false;
+        Ok(())
+    }
+
+    /// Set the audio source (microphone or system audio)
+    pub fn set_audio_source(&self, source: AudioSource) -> Result<(), anyhow::Error> {
+        // Stop current source
+        match *self.current_source.lock().unwrap() {
+            AudioSource::Microphone => {
+                if *self.is_open.lock().unwrap() {
+                    self.stop_microphone_stream();
+                }
+            }
+            AudioSource::SystemAudio(_) => {
+                if *self.is_open.lock().unwrap() {
+                    self.stop_system_audio()?;
+                }
+            }
+        }
+
+        // Start new source
+        match source {
+            AudioSource::Microphone => {
+                self.start_microphone_stream()?;
+                *self.current_source.lock().unwrap() = AudioSource::Microphone;
+            }
+            AudioSource::SystemAudio(device_name) => {
+                self.start_system_audio(device_name)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Get buffered audio from system audio (for continuous recording)
+    pub fn get_system_audio_buffer(&self, duration_secs: f32) -> Vec<f32> {
+        let mut buffer = self.system_audio_buffer.lock().unwrap();
+        let samples_needed = (WHISPER_SAMPLE_RATE as f32 * duration_secs) as usize;
+
+        if buffer.len() >= samples_needed {
+            let chunk: Vec<f32> = buffer.drain(..samples_needed).collect();
+            chunk
+        } else {
+            // Return what we have and clear
+            let chunk = buffer.clone();
+            buffer.clear();
+            chunk
+        }
+    }
+
+    /// Get current audio source
+    pub fn get_audio_source(&self) -> AudioSource {
+        self.current_source.lock().unwrap().clone()
+    }
+
+    /// Get the current buffer size (for testing/debugging)
+    pub fn get_system_audio_buffer_size(&self) -> usize {
+        self.system_audio_buffer.lock().unwrap().len()
+    }
+
+    /// Clear the system audio buffer
+    pub fn clear_system_audio_buffer(&self) {
+        self.system_audio_buffer.lock().unwrap().clear();
+    }
+
+    /// Save the current buffer to a WAV file (for testing/debugging)
+    pub fn save_system_audio_buffer_to_wav(&self, filename: &str) -> Result<String, anyhow::Error> {
+        use hound::{WavSpec, WavWriter};
+
+        let buffer = self.system_audio_buffer.lock().unwrap();
+
+        if buffer.is_empty() {
+            return Err(anyhow::anyhow!("Buffer is empty, nothing to save"));
+        }
+
+        // Save to Desktop for easy access
+        let desktop_dir = self.app_handle
+            .path()
+            .desktop_dir()
+            .map_err(|e| anyhow::anyhow!("Failed to get desktop dir: {}", e))?;
+
+        let filepath = desktop_dir.join(filename);
+
+        let spec = WavSpec {
+            channels: 1,
+            sample_rate: WHISPER_SAMPLE_RATE as u32,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        };
+
+        let mut writer = WavWriter::create(&filepath, spec)?;
+
+        for &sample in buffer.iter() {
+            writer.write_sample(sample)?;
+        }
+
+        writer.finalize()?;
+
+        info!("Saved {} samples to {:?}", buffer.len(), filepath);
+        Ok(filepath.to_string_lossy().to_string())
     }
 }

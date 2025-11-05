@@ -1,7 +1,11 @@
 pub mod audio;
 pub mod history;
+pub mod meeting;
 pub mod models;
+pub mod system_audio;
 pub mod transcription;
+pub mod automation;
+pub mod github;
 
 use crate::utils::cancel_current_operation;
 use tauri::{AppHandle, Manager};

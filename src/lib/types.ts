@@ -66,6 +66,16 @@ export const SettingsSchema = z.object({
   paste_method: PasteMethodSchema.optional().default("ctrl_v"),
   clipboard_handling: ClipboardHandlingSchema.optional().default("dont_modify"),
   mute_while_recording: z.boolean().optional().default(false),
+  transcription_chunk_seconds: z.number().optional().default(10),
+  meeting_update_interval_seconds: z.number().optional().default(20),
+  auto_trigger_meeting_command: z.boolean().optional().default(false),
+  auto_accept_changes: z.boolean().optional().default(false),
+  auto_trigger_min_interval_seconds: z.number().optional().default(75),
+  github_repo_owner: z.string().nullable().optional(),
+  github_repo_name: z.string().nullable().optional(),
+  github_default_branch: z.string().optional().default("main"),
+  github_branch_pattern: z.string().optional().default("meeting/{meeting_id}"),
+  github_enabled: z.boolean().optional().default(false),
 });
 
 export const BindingResponseSchema = z.object({
@@ -96,3 +106,98 @@ export const ModelInfoSchema = z.object({
 });
 
 export type ModelInfo = z.infer<typeof ModelInfoSchema>;
+
+// Meeting types
+export const MeetingStatusSchema = z.enum(["recording", "paused", "completed"]);
+export type MeetingStatus = z.infer<typeof MeetingStatusSchema>;
+
+export const TranscriptSegmentSchema = z.object({
+  speaker: z.string(),
+  start_time: z.number(),
+  end_time: z.number(),
+  text: z.string(),
+  confidence: z.number(),
+  timestamp: z.number(), // Unix timestamp in milliseconds
+});
+
+export type TranscriptSegment = z.infer<typeof TranscriptSegmentSchema>;
+
+export const MeetingSessionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  start_time: z.number(), // Unix timestamp
+  end_time: z.number().optional().nullable(),
+  transcript_segments: z.array(TranscriptSegmentSchema),
+  status: MeetingStatusSchema,
+  participants: z.array(z.string()),
+});
+
+export type MeetingSession = z.infer<typeof MeetingSessionSchema>;
+
+export const MeetingSummarySchema = z.object({
+  meeting_id: z.string(),
+  name: z.string(),
+  duration_seconds: z.number(),
+  total_segments: z.number(),
+  participants: z.array(z.string()),
+  start_time: z.number(),
+  end_time: z.number(),
+});
+
+export type MeetingSummary = z.infer<typeof MeetingSummarySchema>;
+
+// GitHub types
+export const GitHubRepoStatusSchema = z.object({
+  repo_owner: z.string().nullable().optional(),
+  repo_name: z.string().nullable().optional(),
+  default_branch: z.string(),
+  branch_pattern: z.string(),
+  has_token: z.boolean(),
+  current_branch: z.string().nullable().optional(),
+  last_pr_url: z.string().nullable().optional(),
+  last_pr_number: z.number().nullable().optional(),
+  last_push_time: z.string().nullable().optional(),
+});
+
+export type GitHubRepoStatus = z.infer<typeof GitHubRepoStatusSchema>;
+
+export const GitHubConnectionTestSchema = z.object({
+  success: z.boolean(),
+  username: z.string().nullable().optional(),
+  error: z.string().nullable().optional(),
+});
+
+export type GitHubConnectionTest = z.infer<typeof GitHubConnectionTestSchema>;
+
+export const PushResultSchema = z.object({
+  success: z.boolean(),
+  branch: z.string(),
+  commit_message: z.string(),
+  error: z.string().nullable().optional(),
+});
+
+export type PushResult = z.infer<typeof PushResultSchema>;
+
+export const PRResultSchema = z.object({
+  success: z.boolean(),
+  pr_number: z.number().nullable().optional(),
+  pr_url: z.string().nullable().optional(),
+  error: z.string().nullable().optional(),
+});
+
+export type PRResult = z.infer<typeof PRResultSchema>;
+
+export const RepoInfoSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  full_name: z.string(),
+  owner: z.object({
+    login: z.string(),
+  }),
+  private: z.boolean(),
+  description: z.string().nullable().optional(),
+  html_url: z.string(),
+  default_branch: z.string(),
+});
+
+export type RepoInfo = z.infer<typeof RepoInfoSchema>;

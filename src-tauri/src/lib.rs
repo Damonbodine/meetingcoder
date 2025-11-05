@@ -7,11 +7,19 @@ mod managers;
 mod overlay;
 mod settings;
 mod shortcut;
+mod storage;
+mod project;
+mod meeting;
+mod summarization;
+mod system_audio;
 mod tray;
 mod utils;
+mod automation;
+mod integrations;
 
 use managers::audio::AudioRecordingManager;
 use managers::history::HistoryManager;
+use managers::meeting::MeetingManager;
 use managers::model::ModelManager;
 use managers::transcription::TranscriptionManager;
 use std::collections::HashMap;
@@ -66,12 +74,17 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     );
     let history_manager =
         Arc::new(HistoryManager::new(app_handle).expect("Failed to initialize history manager"));
+    let meeting_manager = Arc::new(
+        MeetingManager::new(app_handle, recording_manager.clone(), transcription_manager.clone())
+            .expect("Failed to initialize meeting manager"),
+    );
 
     // Add managers to Tauri's managed state
     app_handle.manage(recording_manager.clone());
     app_handle.manage(model_manager.clone());
     app_handle.manage(transcription_manager.clone());
     app_handle.manage(history_manager.clone());
+    app_handle.manage(meeting_manager.clone());
 
     // Initialize the shortcuts
     shortcut::init_shortcuts(app_handle);
@@ -238,6 +251,15 @@ pub fn run() {
             shortcut::suspend_binding,
             shortcut::resume_binding,
             shortcut::change_mute_while_recording_setting,
+            shortcut::change_meeting_update_interval_seconds_setting,
+            shortcut::change_auto_trigger_meeting_command_setting,
+            shortcut::change_auto_accept_changes_setting,
+            shortcut::change_auto_trigger_min_interval_seconds_setting,
+            shortcut::change_github_repo_owner_setting,
+            shortcut::change_github_repo_name_setting,
+            shortcut::change_github_default_branch_setting,
+            shortcut::change_github_branch_pattern_setting,
+            shortcut::change_github_enabled_setting,
             trigger_update_check,
             commands::cancel_operation,
             commands::get_app_dir_path,
@@ -263,6 +285,12 @@ pub fn run() {
             commands::audio::get_selected_output_device,
             commands::audio::play_test_sound,
             commands::audio::check_custom_sounds,
+            commands::audio::set_system_audio_source,
+            commands::audio::set_microphone_source,
+            commands::audio::get_current_audio_source,
+            commands::audio::get_system_audio_buffer_size,
+            commands::audio::save_system_audio_buffer_to_wav,
+            commands::audio::clear_system_audio_buffer,
             commands::transcription::set_model_unload_timeout,
             commands::transcription::get_model_load_status,
             commands::transcription::unload_model_manually,
@@ -270,7 +298,35 @@ pub fn run() {
             commands::history::toggle_history_entry_saved,
             commands::history::get_audio_file_path,
             commands::history::delete_history_entry,
-            commands::history::update_history_limit
+            commands::history::update_history_limit,
+            commands::meeting::start_meeting,
+            commands::meeting::end_meeting,
+            commands::meeting::pause_meeting,
+            commands::meeting::resume_meeting,
+            commands::meeting::get_live_transcript,
+            commands::meeting::update_speaker_labels,
+            commands::meeting::get_active_meetings,
+            commands::meeting::get_meeting_project_path,
+            commands::automation::trigger_meeting_command_now,
+            commands::automation::open_meeting_terminal,
+            commands::automation::open_meeting_vscode,
+            commands::automation::open_meeting_cursor,
+            commands::automation::open_meeting_vscode_with_meeting,
+            commands::automation::open_meeting_cursor_with_meeting,
+            commands::github::set_github_token,
+            commands::github::remove_github_token,
+            commands::github::test_github_connection,
+            commands::github::list_github_repos,
+            commands::github::set_github_repo,
+            commands::github::set_github_enabled,
+            commands::github::get_github_repo_status,
+            commands::github::push_meeting_changes,
+            commands::github::create_or_update_pr,
+            commands::github::post_meeting_update_comment,
+            commands::system_audio::is_system_audio_supported,
+            commands::system_audio::get_system_audio_setup_instructions,
+            commands::system_audio::detect_virtual_audio_device,
+            commands::system_audio::list_system_audio_devices
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

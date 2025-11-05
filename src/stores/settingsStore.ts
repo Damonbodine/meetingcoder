@@ -54,6 +54,16 @@ const DEFAULT_SETTINGS: Partial<Settings> = {
   custom_words: [],
   history_limit: 5,
   mute_while_recording: false,
+  transcription_chunk_seconds: 10,
+  meeting_update_interval_seconds: 20,
+  auto_trigger_meeting_command: false,
+  auto_accept_changes: false,
+  auto_trigger_min_interval_seconds: 75,
+  github_repo_owner: null,
+  github_repo_name: null,
+  github_default_branch: "main",
+  github_branch_pattern: "meeting/{meeting_id}",
+  github_enabled: false,
 };
 
 const DEFAULT_AUDIO_DEVICE: AudioDevice = {
@@ -104,6 +114,26 @@ const settingUpdaters: {
   history_limit: (value) => invoke("update_history_limit", { limit: value }),
   mute_while_recording: (value) =>
     invoke("change_mute_while_recording_setting", { enabled: value }),
+  transcription_chunk_seconds: (value) =>
+    invoke("change_transcription_chunk_seconds_setting", { seconds: value }),
+  meeting_update_interval_seconds: (value) =>
+    invoke("change_meeting_update_interval_seconds_setting", { seconds: value }),
+  auto_trigger_meeting_command: (value) =>
+    invoke("change_auto_trigger_meeting_command_setting", { enabled: value }),
+  auto_accept_changes: (value) =>
+    invoke("change_auto_accept_changes_setting", { enabled: value }),
+  auto_trigger_min_interval_seconds: (value) =>
+    invoke("change_auto_trigger_min_interval_seconds_setting", { seconds: value }),
+  github_repo_owner: (value) =>
+    invoke("change_github_repo_owner_setting", { owner: value }),
+  github_repo_name: (value) =>
+    invoke("change_github_repo_name_setting", { name: value }),
+  github_default_branch: (value) =>
+    invoke("change_github_default_branch_setting", { branch: value }),
+  github_branch_pattern: (value) =>
+    invoke("change_github_branch_pattern_setting", { pattern: value }),
+  github_enabled: (value) =>
+    invoke("change_github_enabled_setting", { enabled: value }),
 };
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -134,7 +164,10 @@ export const useSettingsStore = create<SettingsStore>()(
     refreshSettings: async () => {
       try {
         const { load } = await import("@tauri-apps/plugin-store");
-        const store = await load("settings_store.json", { autoSave: false });
+        const store = await load("settings_store.json", {
+          autoSave: false,
+          defaults: { settings: DEFAULT_SETTINGS },
+        });
         const settings = (await store.get("settings")) as Settings;
 
         // Load additional settings that come from invoke calls

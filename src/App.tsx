@@ -69,6 +69,8 @@ function App() {
     return <Onboarding onModelSelected={handleModelSelected} />;
   }
 
+  const activeLabel = SECTIONS_CONFIG[currentSection]?.label ?? "";
+
   return (
     <div className="h-screen flex flex-col">
       <Toaster />
@@ -80,6 +82,12 @@ function App() {
         />
         {/* Scrollable content area */}
         <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Simple header for section context */}
+          <div className="px-4 py-2 border-b border-mid-gray/20 flex items-center justify-between bg-black/20">
+            <h2 className="text-sm font-semibold tracking-wide uppercase opacity-80">
+              {activeLabel}
+            </h2>
+          </div>
           <div className="flex-1 overflow-y-auto">
             <div className="flex flex-col items-center p-4 gap-4">
               <AccessibilityPermissions />

@@ -1,6 +1,6 @@
 use crate::audio_feedback;
 use crate::audio_toolkit::audio::{list_input_devices, list_output_devices};
-use crate::managers::audio::{AudioRecordingManager, MicrophoneMode};
+use crate::managers::audio::{AudioRecordingManager, AudioSource, MicrophoneMode};
 use crate::settings::{get_settings, write_settings};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -158,4 +158,60 @@ pub fn play_test_sound(app: AppHandle, sound_type: String) {
         }
     };
     audio_feedback::play_test_sound(&app, sound);
+}
+
+/* ──────────────────────────────────────────────────────────────── */
+/* Audio Source Switching Commands                                    */
+/* ──────────────────────────────────────────────────────────────── */
+
+#[tauri::command]
+pub fn set_system_audio_source(
+    app: AppHandle,
+    device_name: String,
+) -> Result<(), String> {
+    let rm = app.state::<Arc<AudioRecordingManager>>();
+
+    rm.set_audio_source(AudioSource::SystemAudio(device_name))
+        .map_err(|e| format!("Failed to set system audio source: {}", e))
+}
+
+#[tauri::command]
+pub fn set_microphone_source(app: AppHandle) -> Result<(), String> {
+    let rm = app.state::<Arc<AudioRecordingManager>>();
+
+    rm.set_audio_source(AudioSource::Microphone)
+        .map_err(|e| format!("Failed to set microphone source: {}", e))
+}
+
+#[tauri::command]
+pub fn get_current_audio_source(app: AppHandle) -> Result<String, String> {
+    let rm = app.state::<Arc<AudioRecordingManager>>();
+
+    match rm.get_audio_source() {
+        AudioSource::Microphone => Ok("microphone".to_string()),
+        AudioSource::SystemAudio(device) => Ok(format!("system:{}", device)),
+    }
+}
+
+#[tauri::command]
+pub fn get_system_audio_buffer_size(app: AppHandle) -> Result<usize, String> {
+    let rm = app.state::<Arc<AudioRecordingManager>>();
+    Ok(rm.get_system_audio_buffer_size())
+}
+
+#[tauri::command]
+pub fn save_system_audio_buffer_to_wav(
+    app: AppHandle,
+    filename: String,
+) -> Result<String, String> {
+    let rm = app.state::<Arc<AudioRecordingManager>>();
+    rm.save_system_audio_buffer_to_wav(&filename)
+        .map_err(|e| format!("Failed to save WAV: {}", e))
+}
+
+#[tauri::command]
+pub fn clear_system_audio_buffer(app: AppHandle) -> Result<(), String> {
+    let rm = app.state::<Arc<AudioRecordingManager>>();
+    rm.clear_system_audio_buffer();
+    Ok(())
 }

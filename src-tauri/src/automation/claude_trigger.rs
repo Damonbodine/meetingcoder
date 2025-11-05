@@ -140,9 +140,9 @@ pub fn trigger_meeting_update(
         r#"tell application "Terminal"
 activate
 if (count of windows) > 0 then
-    do script "cd {} && /meeting" in selected tab of front window
+    do script "cd {} && export PATH=\"$PWD/.claude/bin:$PATH\"; meeting" in selected tab of front window
 else
-    do script "cd {} && /meeting"
+    do script "cd {} && export PATH=\"$PWD/.claude/bin:$PATH\"; meeting"
 end if
 end tell"#,
         escaped, escaped
@@ -161,7 +161,7 @@ on error
     set newWindow to current window
 end try
 tell current session of newWindow
-    write text "cd {} && /meeting"
+    write text "cd {} && export PATH=\"$PWD/.claude/bin:$PATH\"; meeting"
 end tell
 end tell"#,
             escaped
@@ -216,7 +216,7 @@ pub fn open_project_in_terminal(_app: &AppHandle, project_path: &str) -> Result<
     let script = format!(
         r#"tell application "Terminal"
 activate
-do script "cd {}"
+do script "cd {} && export PATH=\"$PWD/.claude/bin:$PATH\""
 end tell"#,
         escaped
     );
@@ -231,7 +231,7 @@ on error
     set newWindow to current window
 end try
 tell current session of newWindow
-    write text "cd {}"
+    write text "cd {} && export PATH=\"$PWD/.claude/bin:$PATH\""
 end tell
 end tell"#,
             escaped
@@ -239,4 +239,127 @@ end tell"#,
         run_osascript(&script_iterm)?;
     }
     Ok(())
+}
+
+pub fn open_project_in_vscode(project_path: &str) -> Result<()> {
+    // Reuse path validation for safety
+    let validated_path = validate_project_path(project_path)?;
+
+    // macOS: prefer open -a "Visual Studio Code" <path>
+    #[cfg(target_os = "macos")]
+    {
+        let out = Command::new("open")
+            .arg("-a")
+            .arg("Visual Studio Code")
+            .arg(&validated_path)
+            .output()?;
+        if out.status.success() {
+            return Ok(());
+        }
+        // Fallback to CLI if available
+        if let Ok(out2) = Command::new("code").arg(&validated_path).output() {
+            if out2.status.success() { return Ok(()); }
+        }
+        return Err(anyhow!("Failed to open VS Code: {}", String::from_utf8_lossy(&out.stderr)));
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Try VS Code CLI on other platforms
+        let out = Command::new("code").arg(&validated_path).output();
+        match out {
+            Ok(o) if o.status.success() => Ok(()),
+            Ok(o) => Err(anyhow!("Failed to open VS Code: {}", String::from_utf8_lossy(&o.stderr))),
+            Err(e) => Err(anyhow!("Failed to run code: {}", e)),
+        }
+    }
+}
+
+pub fn open_project_in_cursor(project_path: &str) -> Result<()> {
+    let validated_path = validate_project_path(project_path)?;
+
+    #[cfg(target_os = "macos")]
+    {
+        // Try Cursor via open -a "Cursor"
+        if let Ok(out) = Command::new("open").arg("-a").arg("Cursor").arg(&validated_path).output() {
+            if out.status.success() { return Ok(()); }
+        }
+        // Fallback to possible CLI names
+        if let Ok(out2) = Command::new("cursor").arg(&validated_path).output() {
+            if out2.status.success() { return Ok(()); }
+        }
+        Err(anyhow!("Failed to open Cursor editor"))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Non-macOS: attempt a 'cursor' CLI if present
+        if let Ok(out2) = Command::new("cursor").arg(&validated_path).output() {
+            if out2.status.success() { return Ok(()); }
+        }
+        Err(anyhow!("Cursor opening not implemented on this OS"))
+    }
+}
+
+pub fn open_vscode_with_meeting(project_path: &str) -> Result<()> {
+    let validated_path = validate_project_path(project_path)?;
+    let escaped = escape_path_for_applescript(&validated_path);
+
+    #[cfg(target_os = "macos")]
+    {
+        // Use menu navigation to open an integrated terminal and run the /meeting command
+        let script = format!(
+            r#"tell application "Visual Studio Code" to activate
+delay 0.4
+tell application "System Events"
+  tell process "Visual Studio Code"
+    try
+      click menu item "New Terminal" of menu 1 of menu bar item "Terminal" of menu bar 1
+    on error
+      keystroke "`" using {{command down}}
+    end try
+  end tell
+  delay 0.4
+  keystroke "cd {} && export PATH=\"$PWD/.claude/bin:$PATH\"; meeting"
+  key code 36 -- Return
+end tell"#,
+            escaped
+        );
+        run_osascript(&script)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Non-macOS: best-effort using CLI to open; user can run /meeting manually
+        open_project_in_vscode(project_path)
+    }
+}
+
+pub fn open_cursor_with_meeting(project_path: &str) -> Result<()> {
+    let validated_path = validate_project_path(project_path)?;
+    let escaped = escape_path_for_applescript(&validated_path);
+
+    #[cfg(target_os = "macos")]
+    {
+        // Use menu to open integrated terminal then run the /meeting command
+        let script = format!(
+            r#"tell application "Cursor" to activate
+delay 0.4
+tell application "System Events"
+  tell process "Cursor"
+    try
+      click menu item "New Terminal" of menu 1 of menu bar item "Terminal" of menu bar 1
+    on error
+      keystroke "`" using {{command down}}
+    end try
+  end tell
+  delay 0.4
+  keystroke "cd {} && export PATH=\"$PWD/.claude/bin:$PATH\"; meeting"
+  key code 36 -- Return
+end tell"#,
+            escaped
+        );
+        run_osascript(&script)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        open_project_in_cursor(project_path)
+    }
 }

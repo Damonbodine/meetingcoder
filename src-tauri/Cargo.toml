@@ -66,6 +66,15 @@ tar = "0.4.44"
 flate2 = "1.0"
 transcribe-rs = "0.1.4"
 cpvc = "0.4.1"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+thiserror = "2.0"
+dirs = "5.0"
+git2 = "0.19"
+keyring = "3.2"
+base64 = "0.22"
+
+[dev-dependencies]
+tempfile = "3.0"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2.5.1"

@@ -1,15 +1,10 @@
 import React from "react";
-import { Cog, FlaskConical, History, Info } from "lucide-react";
+import { Cog, FlaskConical, History, Info, Plug, Video } from "lucide-react";
 import HandyTextLogo from "./icons/HandyTextLogo";
 import HandyHand from "./icons/HandyHand";
 import { useSettings } from "../hooks/useSettings";
-import {
-  GeneralSettings,
-  AdvancedSettings,
-  HistorySettings,
-  DebugSettings,
-  AboutSettings,
-} from "./settings";
+import { GeneralSettings, AdvancedSettings, HistorySettings, DebugSettings, AboutSettings, IntegrationsSettings } from "./settings";
+import { MeetingView } from "./meeting";
 
 export type SidebarSection = keyof typeof SECTIONS_CONFIG;
 
@@ -33,6 +28,18 @@ export const SECTIONS_CONFIG = {
     label: "General",
     icon: HandyHand,
     component: GeneralSettings,
+    enabled: () => true,
+  },
+  meetings: {
+    label: "Meetings",
+    icon: Video,
+    component: MeetingView,
+    enabled: () => true,
+  },
+  integrations: {
+    label: "Integrations",
+    icon: Plug,
+    component: IntegrationsSettings,
     enabled: () => true,
   },
   advanced: {

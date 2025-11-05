@@ -7,6 +7,7 @@ import { ClipboardHandlingSetting } from "./ClipboardHandling";
 import { AlwaysOnMicrophone } from "./AlwaysOnMicrophone";
 import { SoundPicker } from "./SoundPicker";
 import { MuteWhileRecording } from "./MuteWhileRecording";
+import SystemAudioTest from "./SystemAudioTest";
 
 export const DebugSettings: React.FC = () => {
   return (
@@ -22,6 +23,10 @@ export const DebugSettings: React.FC = () => {
         <HistoryLimit descriptionMode="tooltip" grouped={true} />
         <AlwaysOnMicrophone descriptionMode="tooltip" grouped={true} />
         <MuteWhileRecording descriptionMode="tooltip" grouped={true} />
+      </SettingsGroup>
+
+      <SettingsGroup title="System Audio Testing">
+        <SystemAudioTest />
       </SettingsGroup>
     </div>
   );
