@@ -33,9 +33,20 @@ impl HistoryManager {
         let recordings_dir = app_data_dir.join("recordings");
         let db_path = app_data_dir.join("history.db");
 
-        // Ensure recordings directory exists
+        // Ensure recordings directory exists with secure permissions
         if !recordings_dir.exists() {
-            fs::create_dir_all(&recordings_dir)?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::DirBuilderExt;
+                std::fs::DirBuilder::new()
+                    .mode(0o700) // User-only access
+                    .recursive(true)
+                    .create(&recordings_dir)?;
+            }
+            #[cfg(not(unix))]
+            {
+                fs::create_dir_all(&recordings_dir)?;
+            }
             debug!("Created recordings directory: {:?}", recordings_dir);
         }
 
@@ -97,6 +108,12 @@ impl HistoryManager {
         // If history limit is 0, do not save at all.
         if crate::settings::get_history_limit(&self.app_handle) == 0 {
             return Ok(());
+        }
+
+        // Security: Validate transcription text length to prevent resource exhaustion
+        const MAX_TEXT_LENGTH: usize = 100_000; // 100KB limit
+        if transcription_text.len() > MAX_TEXT_LENGTH {
+            return Err(anyhow!("Transcription text exceeds maximum length of {} bytes", MAX_TEXT_LENGTH));
         }
 
         let timestamp = Utc::now().timestamp();
@@ -235,8 +252,31 @@ impl HistoryManager {
         Ok(())
     }
 
-    pub fn get_audio_file_path(&self, file_name: &str) -> PathBuf {
-        self.recordings_dir.join(file_name)
+    pub fn get_audio_file_path(&self, file_name: &str) -> Result<PathBuf> {
+        // Security: Double-check that the constructed path is within recordings_dir
+        let path = self.recordings_dir.join(file_name);
+
+        // Canonicalize both paths for comparison (if file exists)
+        // If file doesn't exist yet, just verify the parent directory
+        if path.exists() {
+            let canonical_path = path.canonicalize()
+                .map_err(|e| anyhow!("Failed to resolve file path: {}", e))?;
+            let canonical_recordings = self.recordings_dir.canonicalize()
+                .map_err(|e| anyhow!("Failed to resolve recordings directory: {}", e))?;
+
+            if !canonical_path.starts_with(&canonical_recordings) {
+                return Err(anyhow!("Access denied: path traversal attempt detected"));
+            }
+        } else {
+            // For non-existent files, verify the parent directory is recordings_dir
+            if let Some(parent) = path.parent() {
+                if parent != self.recordings_dir {
+                    return Err(anyhow!("Access denied: invalid parent directory"));
+                }
+            }
+        }
+
+        Ok(path)
     }
 
     pub async fn get_entry_by_id(&self, id: i64) -> Result<Option<HistoryEntry>> {
@@ -268,7 +308,7 @@ impl HistoryManager {
         // Get the entry to find the file name
         if let Some(entry) = self.get_entry_by_id(id).await? {
             // Delete the audio file first
-            let file_path = self.get_audio_file_path(&entry.file_name);
+            let file_path = self.get_audio_file_path(&entry.file_name)?;
             if file_path.exists() {
                 if let Err(e) = fs::remove_file(&file_path) {
                     error!("Failed to delete audio file {}: {}", entry.file_name, e);

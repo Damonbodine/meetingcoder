@@ -1,6 +1,36 @@
 use crate::managers::history::{HistoryEntry, HistoryManager};
+use std::path::{Component, Path};
 use std::sync::Arc;
 use tauri::{AppHandle, State};
+
+/// Security: Sanitize filename to prevent path traversal attacks
+fn sanitize_filename(filename: &str) -> Result<String, String> {
+    // Reject empty filenames
+    if filename.is_empty() {
+        return Err("Filename cannot be empty".to_string());
+    }
+
+    // Reject filenames that are too long
+    if filename.len() > 255 {
+        return Err("Filename too long".to_string());
+    }
+
+    // Reject path traversal attempts by checking path components
+    let path = Path::new(filename);
+    for component in path.components() {
+        match component {
+            Component::Normal(_) => continue,
+            _ => return Err("Invalid filename: path traversal detected".to_string()),
+        }
+    }
+
+    // Reject filenames with null bytes or path separators
+    if filename.contains(&['\0', '/', '\\'][..]) {
+        return Err("Invalid filename: contains illegal characters".to_string());
+    }
+
+    Ok(filename.to_string())
+}
 
 #[tauri::command]
 pub async fn get_history_entries(
@@ -31,7 +61,10 @@ pub async fn get_audio_file_path(
     history_manager: State<'_, Arc<HistoryManager>>,
     file_name: String,
 ) -> Result<String, String> {
-    let path = history_manager.get_audio_file_path(&file_name);
+    // Security: Sanitize filename to prevent path traversal
+    let sanitized = sanitize_filename(&file_name)?;
+
+    let path = history_manager.get_audio_file_path(&sanitized)?;
     path.to_str()
         .ok_or_else(|| "Invalid file path".to_string())
         .map(|s| s.to_string())

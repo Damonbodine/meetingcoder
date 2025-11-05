@@ -2,6 +2,7 @@ use crate::settings::{get_settings, write_settings};
 use anyhow::Result;
 use flate2::read::GzDecoder;
 use futures_util::StreamExt;
+use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -328,9 +329,16 @@ impl ModelManager {
 
         // Don't download if complete version already exists
         if model_path.exists() {
-            // Clean up any partial file that might exist
-            if partial_path.exists() {
-                let _ = fs::remove_file(&partial_path);
+            // Security: Clean up any partial file - handle TOCTOU race condition
+            match fs::remove_file(&partial_path) {
+                Ok(_) => debug!("Removed partial file"),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    // File doesn't exist, which is fine
+                }
+                Err(e) => {
+                    error!("Failed to remove partial file: {}", e);
+                    // Continue anyway - not critical
+                }
             }
             self.update_download_status()?;
             return Ok(());
@@ -354,8 +362,11 @@ impl ModelManager {
             }
         }
 
-        // Create HTTP client with range request for resuming
-        let client = reqwest::Client::new();
+        // Security: Create HTTP client with explicit TLS configuration
+        let client = reqwest::Client::builder()
+            .danger_accept_invalid_certs(false) // Explicitly reject invalid certs
+            .min_tls_version(reqwest::tls::Version::TLS_1_2) // Enforce TLS 1.2+
+            .build()?;
         let mut request = client.get(&url);
 
         if resume_from > 0 {
