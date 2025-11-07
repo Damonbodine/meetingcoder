@@ -36,7 +36,7 @@ export const AboutSettings: React.FC = () => {
       <SettingsGroup title="About">
         <SettingContainer
           title="Version"
-          description="Current version of Handy"
+          description="Current version of MeetingCoder"
           grouped={true}
         >
           <span className="text-sm font-mono">v{version}</span>
@@ -60,7 +60,7 @@ export const AboutSettings: React.FC = () => {
 
         <SettingContainer
           title="Support Development"
-          description="Help us continue building Handy"
+          description="Help us continue building MeetingCoder"
           grouped={true}
         >
           <Button variant="primary" size="md" onClick={handleDonateClick}>
@@ -77,7 +77,7 @@ export const AboutSettings: React.FC = () => {
           layout="stacked"
         >
           <div className="text-sm text-mid-gray">
-            Handy uses Whisper.cpp for fast, local speech-to-text processing.
+            MeetingCoder uses Whisper.cpp for fast, local speech-to-text processing.
             Thanks to the amazing work by Georgi Gerganov and contributors.
           </div>
         </SettingContainer>

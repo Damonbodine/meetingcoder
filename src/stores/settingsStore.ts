@@ -64,6 +64,11 @@ const DEFAULT_SETTINGS: Partial<Settings> = {
   github_default_branch: "main",
   github_branch_pattern: "meeting/{meeting_id}",
   github_enabled: false,
+  prefer_whisper_for_imports: false,
+  fast_import_mode_for_imports: true,
+  use_fixed_windows_for_imports: false,
+  min_segment_duration_for_imports: 10,
+  ffmpeg_fallback_for_imports: true,
 };
 
 const DEFAULT_AUDIO_DEVICE: AudioDevice = {
@@ -134,6 +139,16 @@ const settingUpdaters: {
     invoke("change_github_branch_pattern_setting", { pattern: value }),
   github_enabled: (value) =>
     invoke("change_github_enabled_setting", { enabled: value }),
+  prefer_whisper_for_imports: (value) =>
+    invoke("change_prefer_whisper_for_imports_setting", { enabled: value }),
+  fast_import_mode_for_imports: (value) =>
+    invoke("change_fast_import_mode_for_imports_setting", { enabled: value }),
+  use_fixed_windows_for_imports: (value) =>
+    invoke("change_use_fixed_windows_for_imports_setting", { enabled: value }),
+  min_segment_duration_for_imports: (value) =>
+    invoke("change_min_segment_duration_for_imports_setting", { seconds: value }),
+  ffmpeg_fallback_for_imports: (value) =>
+    invoke("change_ffmpeg_fallback_for_imports_setting", { enabled: value }),
 };
 
 export const useSettingsStore = create<SettingsStore>()(

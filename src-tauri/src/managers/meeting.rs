@@ -213,6 +213,68 @@ impl MeetingManager {
         Ok(meeting_id)
     }
 
+    /// Start a new meeting session without spawning the live transcription loop.
+    /// This is used for offline imports of existing audio.
+    pub async fn start_offline_meeting(&self, name: String) -> Result<String> {
+        let meeting_id = uuid::Uuid::new_v4().to_string();
+        // Initialize meeting in selected GitHub repo when enabled, else fallback to MeetingCoder workspace
+        let settings = settings::get_settings(&self.app_handle);
+        let project_path = if settings.github_enabled
+            && settings.github_repo_owner.is_some()
+            && settings.github_repo_name.is_some()
+        {
+            let owner = settings.github_repo_owner.clone().unwrap();
+            let repo = settings.github_repo_name.clone().unwrap();
+            match crate::integrations::github::get_github_token()
+                .and_then(|token| crate::integrations::github::ensure_local_repo_clone(&owner, &repo, &token))
+            {
+                Ok(repo_root) => {
+                    // Seed meeting scaffolding inside the repo root
+                    let _ = crate::project::initializer::ProjectInitializer::seed_in_existing_dir_with_app(&std::path::PathBuf::from(&repo_root), &self.app_handle);
+                    Some(repo_root)
+                }
+                Err(e) => {
+                    log::warn!("Falling back to MeetingCoder workspace (GitHub clone failed): {}", e);
+                    match crate::project::initializer::ProjectInitializer::with_default_path()
+                        .and_then(|init| init.init_for_meeting_with_app(&name, &self.app_handle))
+                    {
+                        Ok(path) => Some(path),
+                        Err(e) => { log::warn!("Project initialization failed: {}", e); None }
+                    }
+                }
+            }
+        } else {
+            // Fallback when GitHub integration not configured
+            match crate::project::initializer::ProjectInitializer::with_default_path()
+                .and_then(|init| init.init_for_meeting_with_app(&name, &self.app_handle))
+            {
+                Ok(path) => Some(path),
+                Err(e) => { log::warn!("Project initialization failed: {}", e); None }
+            }
+        };
+
+        let meeting = MeetingSession {
+            id: meeting_id.clone(),
+            name: name.clone(),
+            start_time: std::time::SystemTime::now(),
+            end_time: None,
+            transcript_segments: Vec::new(),
+            status: MeetingStatus::Recording,
+            participants: Vec::new(),
+            project_path,
+        };
+
+        // Insert into active meetings
+        {
+            let mut meetings = self.active_meetings.lock().await;
+            meetings.insert(meeting_id.clone(), meeting);
+        }
+
+        // Note: Do not auto-load a model here for offline imports.
+        // The import flow selects and loads the appropriate engine (e.g., Whisper preference).
+        Ok(meeting_id)
+    }
+
     /// Pause an active meeting
     pub async fn pause_meeting(&self, meeting_id: &str) -> Result<()> {
         let mut meetings = self.active_meetings.lock().await;
@@ -276,10 +338,56 @@ impl MeetingManager {
             }
 
             // Save transcript to disk
-            if let Err(e) = self.transcript_storage.save_transcript(&meeting) {
-                log::error!("Failed to save transcript for meeting {}: {}", meeting.name, e);
-            } else {
-                log::info!("Transcript saved for meeting: {}", meeting.name);
+            match self.transcript_storage.save_transcript(&meeting) {
+                Err(e) => {
+                    log::error!("Failed to save transcript for meeting {}: {}", meeting.name, e);
+                }
+                Ok(meeting_dir) => {
+                    log::info!("Transcript saved for meeting: {}", meeting.name);
+                    // Generate a lightweight summary.md similar to Zoom meeting summary
+                    if !meeting.transcript_segments.is_empty() {
+                        let start_idx = 0usize;
+                        let end_idx = meeting.transcript_segments.len().saturating_sub(1);
+                        let summary = crate::summarization::agent::summarize_segments_with_context(
+                            meeting.project_path.as_deref(),
+                            &meeting.transcript_segments,
+                            start_idx,
+                            end_idx,
+                        );
+                        let mut md = String::new();
+                        use std::fmt::Write as _;
+                        let _ = writeln!(md, "# Meeting Summary\n");
+                        let minutes = duration.as_secs() / 60;
+                        let _ = writeln!(md, "**Title**: {}", meeting.name);
+                        let _ = writeln!(md, "**Duration**: {} minutes\n", minutes);
+                        if !summary.new_features.is_empty() || !summary.new_features_structured.is_empty() {
+                            let _ = writeln!(md, "## Key Points / Features");
+                            if !summary.new_features_structured.is_empty() {
+                                for f in &summary.new_features_structured {
+                                    let _ = writeln!(md, "- {}", f.title);
+                                }
+                            } else {
+                                for s in &summary.new_features { let _ = writeln!(md, "- {}", s); }
+                            }
+                            let _ = writeln!(md);
+                        }
+                        if !summary.technical_decisions.is_empty() {
+                            let _ = writeln!(md, "## Decisions");
+                            for s in &summary.technical_decisions { let _ = writeln!(md, "- {}", s); }
+                            let _ = writeln!(md);
+                        }
+                        if !summary.questions.is_empty() {
+                            let _ = writeln!(md, "## Open Questions");
+                            for s in &summary.questions { let _ = writeln!(md, "- {}", s); }
+                            let _ = writeln!(md);
+                        }
+                        // Save summary.md alongside transcript
+                        let summary_path = meeting_dir.join("summary.md");
+                        if let Err(e) = std::fs::write(&summary_path, md) {
+                            log::warn!("Failed to write summary.md: {}", e);
+                        }
+                    }
+                }
             }
 
             log::info!(

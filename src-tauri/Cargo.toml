@@ -1,11 +1,11 @@
 [package]
-name = "handy"
+name = "meetingcoder"
 version = "0.5.4"
-description = "Handy"
+description = "MeetingCoder"
 authors = ["cjpais"]
 edition = "2021"
 license = "MIT"
-default-run = "handy"
+default-run = "meetingcoder"
 
 [profile.dev]
 incremental = true # Compile your binary in smaller steps.
@@ -16,7 +16,7 @@ incremental = true # Compile your binary in smaller steps.
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "handy_app_lib"
+name = "meetingcoder_app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 # [[bin]]
@@ -42,6 +42,7 @@ tauri-plugin-macos-permissions = "2.3.0"
 tauri-plugin-process = "2.3.1"
 tauri-plugin-sql = { version = "2.3.1", features = ["sqlite"] }
 tauri-plugin-fs = "2.4.4"
+tauri-plugin-dialog = "2.3.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rdev = { git = "https://github.com/rustdesk-org/rdev" }
@@ -55,6 +56,7 @@ tokio = "1.43.0"
 vad-rs = { git = "https://github.com/cjpais/vad-rs", default-features = false }
 enigo = "0.6.1"
 rodio = { git = "https://github.com/cjpais/rodio.git" }
+symphonia = { version = "0.5", default-features = false, features = ["aac", "mp3", "flac", "vorbis", "isomp4", "ogg"] }
 reqwest = { version = "0.11.27", features = ["json", "stream"] }
 futures-util = "0.3"
 rustfft = "6.4.0"

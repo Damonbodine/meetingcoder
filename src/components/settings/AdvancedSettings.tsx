@@ -5,6 +5,11 @@ import { ModelUnloadTimeoutSetting } from "./ModelUnloadTimeout";
 import { CustomWords } from "./CustomWords";
 import { SettingsGroup } from "../ui/SettingsGroup";
 import { StartHidden } from "./StartHidden";
+import { PreferWhisperForImports } from "./PreferWhisperForImports";
+import { FastImportModeForImports } from "./FastImportModeForImports";
+import { UseFixedWindowsForImports } from "./UseFixedWindowsForImports";
+import { MinSegmentDurationForImports } from "./MinSegmentDurationForImports";
+import { UseFfmpegFallbackForImports } from "./UseFfmpegFallbackForImports";
 import { AutostartToggle } from "./AutostartToggle";
 
 export const AdvancedSettings: React.FC = () => {
@@ -17,6 +22,11 @@ export const AdvancedSettings: React.FC = () => {
         <TranslateToEnglish descriptionMode="tooltip" grouped={true} />
         <ModelUnloadTimeoutSetting descriptionMode="tooltip" grouped={true} />
         <CustomWords descriptionMode="tooltip" grouped />
+        <PreferWhisperForImports descriptionMode="tooltip" />
+        <FastImportModeForImports descriptionMode="tooltip" />
+        <UseFixedWindowsForImports descriptionMode="tooltip" />
+        <MinSegmentDurationForImports descriptionMode="tooltip" />
+        <UseFfmpegFallbackForImports descriptionMode="tooltip" />
       </SettingsGroup>
     </div>
   );

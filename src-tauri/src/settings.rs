@@ -183,6 +183,16 @@ pub struct AppSettings {
     pub github_branch_pattern: String,
     #[serde(default = "default_github_enabled")]
     pub github_enabled: bool,
+    #[serde(default = "default_prefer_whisper_for_imports")]
+    pub prefer_whisper_for_imports: bool,
+    #[serde(default = "default_fast_import_mode_for_imports")]
+    pub fast_import_mode_for_imports: bool,
+    #[serde(default = "default_use_fixed_windows_for_imports")]
+    pub use_fixed_windows_for_imports: bool,
+    #[serde(default = "default_min_segment_duration_for_imports")]
+    pub min_segment_duration_for_imports: u32,
+    #[serde(default = "default_ffmpeg_fallback_for_imports")]
+    pub ffmpeg_fallback_for_imports: bool,
 }
 
 fn default_model() -> String {
@@ -255,6 +265,11 @@ fn default_github_default_branch() -> String { "main".to_string() }
 fn default_github_branch_pattern() -> String { "meeting/{meeting_id}".to_string() }
 
 fn default_github_enabled() -> bool { false }
+fn default_prefer_whisper_for_imports() -> bool { false }
+fn default_fast_import_mode_for_imports() -> bool { true }
+fn default_use_fixed_windows_for_imports() -> bool { false }
+fn default_min_segment_duration_for_imports() -> u32 { 10 }
+fn default_ffmpeg_fallback_for_imports() -> bool { true }
 
 pub const SETTINGS_STORE_PATH: &str = "settings_store.json";
 
@@ -313,6 +328,11 @@ pub fn get_default_settings() -> AppSettings {
         github_default_branch: default_github_default_branch(),
         github_branch_pattern: default_github_branch_pattern(),
         github_enabled: default_github_enabled(),
+        prefer_whisper_for_imports: default_prefer_whisper_for_imports(),
+        fast_import_mode_for_imports: default_fast_import_mode_for_imports(),
+        use_fixed_windows_for_imports: default_use_fixed_windows_for_imports(),
+        min_segment_duration_for_imports: default_min_segment_duration_for_imports(),
+        ffmpeg_fallback_for_imports: default_ffmpeg_fallback_for_imports(),
     }
 }
 

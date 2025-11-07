@@ -6,6 +6,7 @@ import { LiveTranscript } from "./LiveTranscript";
 import { MeetingUpdates } from "./MeetingUpdates";
 import { GitHubActions } from "./GitHubActions";
 import { MeetingChecklist } from "./MeetingChecklist";
+import { ImportAudio } from "./ImportAudio";
 import { TranscriptSegment, MeetingSummary } from "../../lib/types";
 import { toast } from "sonner";
 
@@ -158,6 +159,7 @@ export const MeetingView = () => {
 
   return (
     <div className="w-full max-w-4xl space-y-6">
+      <ImportAudio />
       <MeetingControls
         isActive={!!activeMeetingId}
         meetingName={meetingName}

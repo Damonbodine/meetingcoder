@@ -45,6 +45,12 @@ The process is entirely local:
 
 For detailed build instructions including platform-specific requirements, see [BUILD.md](BUILD.md).
 
+### Import Audio/YouTube into MeetingCoder
+
+- Import a local file: Open Meetings → "Import Audio into MeetingCoder", enter a meeting name, and choose an audio file (wav/mp3/m4a/ogg/flac).
+- Import a YouTube URL: Paste the URL and click Import. Requires `yt-dlp` on PATH (macOS: `brew install yt-dlp`).
+- The app creates a transcript and appends `.meeting-updates.jsonl`; automation can run if enabled.
+
 ## Architecture
 
 Handy is built as a Tauri application combining:
@@ -134,3 +140,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ---
 
 *"Your search for the right speech-to-text tool can end here—not because Handy is perfect, but because you can make it perfect for you."*
+## Project Phases
+
+- Phase 1: System audio capture and continuous transcription foundations
+- Phase 6: Import audio and YouTube into MeetingCoder (see `docs/prd/06-PHASE6.md`)

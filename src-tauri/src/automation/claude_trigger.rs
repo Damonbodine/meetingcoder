@@ -140,9 +140,9 @@ pub fn trigger_meeting_update(
         r#"tell application "Terminal"
 activate
 if (count of windows) > 0 then
-    do script "cd {} && export PATH=\"$PWD/.claude/bin:$PATH\"; meeting" in selected tab of front window
+    do script "cd {} && ( [ -x ./.claude/bin/meeting ] && ./.claude/bin/meeting || meeting )" in selected tab of front window
 else
-    do script "cd {} && export PATH=\"$PWD/.claude/bin:$PATH\"; meeting"
+    do script "cd {} && ( [ -x ./.claude/bin/meeting ] && ./.claude/bin/meeting || meeting )"
 end if
 end tell"#,
         escaped, escaped
@@ -161,7 +161,7 @@ on error
     set newWindow to current window
 end try
 tell current session of newWindow
-    write text "cd {} && export PATH=\"$PWD/.claude/bin:$PATH\"; meeting"
+    write text "cd {} && ( [ -x ./.claude/bin/meeting ] && ./.claude/bin/meeting || meeting )"
 end tell
 end tell"#,
             escaped
@@ -216,7 +216,7 @@ pub fn open_project_in_terminal(_app: &AppHandle, project_path: &str) -> Result<
     let script = format!(
         r#"tell application "Terminal"
 activate
-do script "cd {} && export PATH=\"$PWD/.claude/bin:$PATH\""
+do script "cd {}"
 end tell"#,
         escaped
     );
@@ -231,7 +231,7 @@ on error
     set newWindow to current window
 end try
 tell current session of newWindow
-    write text "cd {} && export PATH=\"$PWD/.claude/bin:$PATH\""
+    write text "cd {}"
 end tell
 end tell"#,
             escaped
@@ -245,22 +245,23 @@ pub fn open_project_in_vscode(project_path: &str) -> Result<()> {
     // Reuse path validation for safety
     let validated_path = validate_project_path(project_path)?;
 
-    // macOS: prefer open -a "Visual Studio Code" <path>
+    // macOS: prefer VS Code CLI first, then open -a
     #[cfg(target_os = "macos")]
     {
-        let out = Command::new("open")
+        // Try VS Code CLI with new window flag
+        if let Ok(out_cli) = Command::new("code").arg("-n").arg(&validated_path).output() {
+            if out_cli.status.success() { return Ok(()); }
+        }
+        // Fallback to macOS open with app
+        if let Ok(out) = Command::new("open")
             .arg("-a")
             .arg("Visual Studio Code")
             .arg(&validated_path)
-            .output()?;
-        if out.status.success() {
-            return Ok(());
+            .output() {
+            if out.status.success() { return Ok(()); }
+            return Err(anyhow!("Failed to open VS Code: {}", String::from_utf8_lossy(&out.stderr)));
         }
-        // Fallback to CLI if available
-        if let Ok(out2) = Command::new("code").arg(&validated_path).output() {
-            if out2.status.success() { return Ok(()); }
-        }
-        return Err(anyhow!("Failed to open VS Code: {}", String::from_utf8_lossy(&out.stderr)));
+        return Err(anyhow!("Failed to open VS Code: open command failed"));
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -279,13 +280,14 @@ pub fn open_project_in_cursor(project_path: &str) -> Result<()> {
 
     #[cfg(target_os = "macos")]
     {
-        // Try Cursor via open -a "Cursor"
-        if let Ok(out) = Command::new("open").arg("-a").arg("Cursor").arg(&validated_path).output() {
-            if out.status.success() { return Ok(()); }
-        }
-        // Fallback to possible CLI names
+        // Prefer Cursor CLI if available
         if let Ok(out2) = Command::new("cursor").arg(&validated_path).output() {
             if out2.status.success() { return Ok(()); }
+        }
+        // Fallback to open -a "Cursor"
+        if let Ok(out) = Command::new("open").arg("-a").arg("Cursor").arg(&validated_path).output() {
+            if out.status.success() { return Ok(()); }
+            return Err(anyhow!("Failed to open Cursor: {}", String::from_utf8_lossy(&out.stderr)));
         }
         Err(anyhow!("Failed to open Cursor editor"))
     }
@@ -318,7 +320,7 @@ tell application "System Events"
     end try
   end tell
   delay 0.4
-  keystroke "cd {} && export PATH=\"$PWD/.claude/bin:$PATH\"; meeting"
+  keystroke "cd {} && ( [ -x ./.claude/bin/meeting ] && ./.claude/bin/meeting || meeting )"
   key code 36 -- Return
 end tell"#,
             escaped
@@ -351,7 +353,7 @@ tell application "System Events"
     end try
   end tell
   delay 0.4
-  keystroke "cd {} && export PATH=\"$PWD/.claude/bin:$PATH\"; meeting"
+  keystroke "cd {} && ( [ -x ./.claude/bin/meeting ] && ./.claude/bin/meeting || meeting )"
   key code 36 -- Return
 end tell"#,
             escaped

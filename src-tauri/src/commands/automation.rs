@@ -72,6 +72,9 @@ pub async fn open_meeting_vscode_with_meeting(
         .map_err(|e| format!("{}", e))?;
     let Some(path) = meeting.project_path.clone() else { return Ok(()); };
     if path.is_empty() { return Ok(()); }
+    // Ensure the correct project window is opened/focused first, then run the meeting command
+    // Open project first; then run meeting in the correct workspace
+    let _ = crate::automation::claude_trigger::open_project_in_vscode(&path);
     crate::automation::claude_trigger::open_vscode_with_meeting(&path).map_err(|e| e.to_string())
 }
 
@@ -86,5 +89,8 @@ pub async fn open_meeting_cursor_with_meeting(
         .map_err(|e| format!("{}", e))?;
     let Some(path) = meeting.project_path.clone() else { return Ok(()); };
     if path.is_empty() { return Ok(()); }
+    // Ensure the correct project window is opened/focused first, then run the meeting command
+    // Open project first; then run meeting in the correct workspace
+    let _ = crate::automation::claude_trigger::open_project_in_cursor(&path);
     crate::automation::claude_trigger::open_cursor_with_meeting(&path).map_err(|e| e.to_string())
 }

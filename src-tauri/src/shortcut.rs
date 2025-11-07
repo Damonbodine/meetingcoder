@@ -458,6 +458,82 @@ pub fn change_github_enabled_setting(
     Ok(())
 }
 
+#[tauri::command]
+pub fn change_prefer_whisper_for_imports_setting(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut s = settings::get_settings(&app);
+    s.prefer_whisper_for_imports = enabled;
+    settings::write_settings(&app, s);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "prefer_whisper_for_imports", "value": enabled }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn change_fast_import_mode_for_imports_setting(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut s = settings::get_settings(&app);
+    s.fast_import_mode_for_imports = enabled;
+    settings::write_settings(&app, s);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "fast_import_mode_for_imports", "value": enabled }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn change_use_fixed_windows_for_imports_setting(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut s = settings::get_settings(&app);
+    s.use_fixed_windows_for_imports = enabled;
+    settings::write_settings(&app, s);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "use_fixed_windows_for_imports", "value": enabled }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn change_min_segment_duration_for_imports_setting(
+    app: AppHandle,
+    seconds: u32,
+) -> Result<(), String> {
+    let value = seconds.clamp(5, 15);
+    let mut s = settings::get_settings(&app);
+    s.min_segment_duration_for_imports = value;
+    settings::write_settings(&app, s);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "min_segment_duration_for_imports", "value": value }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn change_ffmpeg_fallback_for_imports_setting(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut s = settings::get_settings(&app);
+    s.ffmpeg_fallback_for_imports = enabled;
+    settings::write_settings(&app, s);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "ffmpeg_fallback_for_imports", "value": enabled }),
+    );
+    Ok(())
+}
+
 /// Determine whether a shortcut string contains at least one non-modifier key.
 /// We allow single non-modifier keys (e.g. "f5" or "space") but disallow
 /// modifier-only combos (e.g. "ctrl" or "ctrl+shift").

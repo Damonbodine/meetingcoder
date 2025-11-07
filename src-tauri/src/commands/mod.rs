@@ -6,9 +6,11 @@ pub mod system_audio;
 pub mod transcription;
 pub mod automation;
 pub mod github;
+pub mod import;
 
 use crate::utils::cancel_current_operation;
 use tauri::{AppHandle, Manager};
+use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
 pub fn cancel_operation(app: AppHandle) {
@@ -23,4 +25,12 @@ pub fn get_app_dir_path(app: AppHandle) -> Result<String, String> {
         .map_err(|e| format!("Failed to get app data directory: {}", e))?;
 
     Ok(app_data_dir.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn open_path_in_file_manager(app: AppHandle, path: String) -> Result<(), String> {
+    app
+        .opener()
+        .open_path(path, None::<&str>)
+        .map_err(|e| e.to_string())
 }

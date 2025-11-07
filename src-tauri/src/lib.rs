@@ -172,6 +172,7 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
         }))
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -260,6 +261,11 @@ pub fn run() {
             shortcut::change_github_default_branch_setting,
             shortcut::change_github_branch_pattern_setting,
             shortcut::change_github_enabled_setting,
+            shortcut::change_prefer_whisper_for_imports_setting,
+            shortcut::change_fast_import_mode_for_imports_setting,
+            shortcut::change_use_fixed_windows_for_imports_setting,
+            shortcut::change_min_segment_duration_for_imports_setting,
+            shortcut::change_ffmpeg_fallback_for_imports_setting,
             trigger_update_check,
             commands::cancel_operation,
             commands::get_app_dir_path,
@@ -307,6 +313,12 @@ pub fn run() {
             commands::meeting::update_speaker_labels,
             commands::meeting::get_active_meetings,
             commands::meeting::get_meeting_project_path,
+            commands::meeting::get_transcript_dir_for,
+            commands::import::import_audio_as_meeting,
+            commands::import::import_youtube_as_meeting,
+            commands::import::pick_audio_file,
+            commands::get_app_dir_path,
+            commands::open_path_in_file_manager,
             commands::automation::trigger_meeting_command_now,
             commands::automation::open_meeting_terminal,
             commands::automation::open_meeting_vscode,

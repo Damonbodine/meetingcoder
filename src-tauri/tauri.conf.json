@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Handy",
+  "productName": "MeetingCoder",
   "version": "0.5.4",
-  "identifier": "com.pais.handy",
+  "identifier": "com.meetingcoder.app",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Handy",
+        "title": "MeetingCoder",
         "width": 680,
         "height": 570,
         "minWidth": 680,

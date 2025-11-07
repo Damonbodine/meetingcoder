@@ -1,4 +1,6 @@
 use crate::managers::meeting::{MeetingManager, MeetingSummary, TranscriptSegment};
+use crate::storage::transcript::TranscriptStorage;
+use chrono::{DateTime, Local, TimeZone};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::State;
@@ -86,4 +88,34 @@ pub async fn get_meeting_project_path(
         Ok(meeting) => Ok(meeting.project_path.clone()),
         Err(e) => Err(format!("Failed to get meeting: {}", e)),
     }
+}
+
+/// Compute the transcript directory path for a given meeting name and start time.
+/// start_time expects a Unix timestamp in seconds or milliseconds.
+#[tauri::command]
+pub fn get_transcript_dir_for(meeting_name: String, start_time: i64) -> Result<String, String> {
+    // Determine if the timestamp is in ms or s
+    let secs = if start_time > 1_000_000_000_000 { // > ~2001-09-09 in ms
+        start_time / 1000
+    } else {
+        start_time
+    };
+
+    // Format date like TranscriptStorage (local time)
+    let dt: DateTime<Local> = Local.timestamp_opt(secs, 0).single().ok_or_else(|| "Invalid timestamp".to_string())?;
+    let date_str = dt.format("%Y-%m-%d").to_string();
+
+    // Sanitize like TranscriptStorage::generate_meeting_dir_name
+    let mut sanitized: String = meeting_name
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-' || *c == '_')
+        .collect();
+    sanitized = sanitized.replace(' ', "-").to_lowercase();
+    if sanitized.is_empty() { sanitized = "untitled".to_string(); }
+    if sanitized.len() > 100 { sanitized.truncate(100); }
+    sanitized = sanitized.replace("..", "");
+
+    let dir_name = format!("{}_{}", date_str, sanitized);
+    let base = TranscriptStorage::default_path().map_err(|e| e.to_string())?;
+    Ok(base.join(dir_name).to_string_lossy().to_string())
 }

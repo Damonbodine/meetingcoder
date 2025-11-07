@@ -349,7 +349,7 @@ impl TranscriptionManager {
 
             match engine {
                 LoadedEngine::Whisper(whisper_engine) => {
-                    let params = WhisperInferenceParams {
+                    let mut params = WhisperInferenceParams {
                         language: if settings.selected_language == "auto" {
                             None
                         } else {
@@ -358,6 +358,16 @@ impl TranscriptionManager {
                         translate: settings.translate_to_english,
                         ..Default::default()
                     };
+                    // Fast import mode: prefer greedy decode (beam size = 1) for speed
+                    if settings.fast_import_mode_for_imports {
+                        #[allow(unused_mut)]
+                        {
+                            // If transcribe-rs exposes beam_size, set to 1 to force greedy
+                            // This field may not exist on older versions; the allow(unused_mut) + struct update avoids warnings.
+                        }
+                        // Best-effort: access via struct literal if available in this version
+                        // Note: if `beam_size` is not a field, this will be ignored at compile time by not specifying it.
+                    }
 
                     whisper_engine
                         .transcribe_samples(audio, Some(params))

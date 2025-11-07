@@ -76,6 +76,11 @@ export const SettingsSchema = z.object({
   github_default_branch: z.string().optional().default("main"),
   github_branch_pattern: z.string().optional().default("meeting/{meeting_id}"),
   github_enabled: z.boolean().optional().default(false),
+  prefer_whisper_for_imports: z.boolean().optional().default(false),
+  fast_import_mode_for_imports: z.boolean().optional().default(true),
+  use_fixed_windows_for_imports: z.boolean().optional().default(false),
+  min_segment_duration_for_imports: z.number().optional().default(10),
+  ffmpeg_fallback_for_imports: z.boolean().optional().default(true),
 });
 
 export const BindingResponseSchema = z.object({
