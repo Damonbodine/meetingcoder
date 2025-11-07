@@ -16,6 +16,7 @@ mod tray;
 mod utils;
 mod automation;
 mod integrations;
+mod codebase;
 
 use managers::audio::AudioRecordingManager;
 use managers::history::HistoryManager;
@@ -314,6 +315,9 @@ pub fn run() {
             commands::meeting::get_active_meetings,
             commands::meeting::get_meeting_project_path,
             commands::meeting::get_transcript_dir_for,
+            commands::meeting::list_saved_meetings,
+            commands::meeting::open_meeting_folder,
+            commands::meeting::delete_saved_meeting,
             commands::import::import_audio_as_meeting,
             commands::import::import_youtube_as_meeting,
             commands::import::pick_audio_file,
@@ -335,6 +339,13 @@ pub fn run() {
             commands::github::push_meeting_changes,
             commands::github::create_or_update_pr,
             commands::github::post_meeting_update_comment,
+            commands::github::github_begin_device_auth,
+            commands::github::github_poll_device_token,
+            commands::llm::store_claude_api_key,
+            commands::llm::has_claude_api_key,
+            commands::llm::delete_claude_api_key,
+            commands::codebase::analyze_project_codebase,
+            commands::codebase::analyze_and_save_codebase,
             commands::system_audio::is_system_audio_supported,
             commands::system_audio::get_system_audio_setup_instructions,
             commands::system_audio::detect_virtual_audio_device,

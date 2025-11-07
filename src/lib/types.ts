@@ -151,6 +151,26 @@ export const MeetingSummarySchema = z.object({
 
 export type MeetingSummary = z.infer<typeof MeetingSummarySchema>;
 
+// Meeting history types
+export const TranscriptMetadataSchema = z.object({
+  meeting_id: z.string(),
+  name: z.string(),
+  start_time: z.string(), // ISO 8601 format
+  end_time: z.string(),   // ISO 8601 format
+  duration_seconds: z.number(),
+  participants: z.array(z.string()),
+});
+
+export type TranscriptMetadata = z.infer<typeof TranscriptMetadataSchema>;
+
+export const MeetingHistoryEntrySchema = z.object({
+  dir_name: z.string(),
+  dir_path: z.string(),
+  metadata: TranscriptMetadataSchema,
+});
+
+export type MeetingHistoryEntry = z.infer<typeof MeetingHistoryEntrySchema>;
+
 // GitHub types
 export const GitHubRepoStatusSchema = z.object({
   repo_owner: z.string().nullable().optional(),

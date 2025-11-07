@@ -4,9 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { MeetingControls } from "./MeetingControls";
 import { LiveTranscript } from "./LiveTranscript";
 import { MeetingUpdates } from "./MeetingUpdates";
-import { GitHubActions } from "./GitHubActions";
 import { MeetingChecklist } from "./MeetingChecklist";
-import { ImportAudio } from "./ImportAudio";
 import { TranscriptSegment, MeetingSummary } from "../../lib/types";
 import { toast } from "sonner";
 
@@ -22,10 +20,15 @@ export const MeetingView = () => {
     if (!activeMeetingId) return;
 
     let unlisten: (() => void) | undefined;
+    let unlistenWarning: (() => void) | undefined;
+    let unlistenRestarting: (() => void) | undefined;
+    let unlistenRestartSuccess: (() => void) | undefined;
+    let unlistenRestartFailed: (() => void) | undefined;
     let isMounted = true;
 
-    const setupListener = async () => {
+    const setupListeners = async () => {
       try {
+        // Listen for transcript segments
         const unlistenFn = await listen<{ meeting_id: string; segment: TranscriptSegment }>(
           "transcript-segment-added",
           (event) => {
@@ -38,26 +41,122 @@ export const MeetingView = () => {
             }
           }
         );
+
+        // Listen for audio stream warnings
+        const unlistenWarningFn = await listen<{
+          meeting_id: string;
+          message: string;
+          consecutive_empty_chunks: number;
+        }>(
+          "audio-stream-warning",
+          (event) => {
+            console.error("Audio stream warning:", event.payload);
+            if (event.payload.meeting_id === activeMeetingId && isMounted) {
+              toast.error("Audio stream issue detected", {
+                description: event.payload.message,
+                duration: 10000,
+              });
+            }
+          }
+        );
+
+        // Listen for audio stream restart attempts
+        const unlistenRestartingFn = await listen<{
+          meeting_id: string;
+          attempt: number;
+          max_attempts: number;
+        }>(
+          "audio-stream-restarting",
+          (event) => {
+            console.log("Audio stream restarting:", event.payload);
+            if (event.payload.meeting_id === activeMeetingId && isMounted) {
+              toast.info("Restarting audio stream", {
+                description: `Attempt ${event.payload.attempt}/${event.payload.max_attempts}. Please wait...`,
+                duration: 5000,
+              });
+            }
+          }
+        );
+
+        // Listen for successful audio stream restart
+        const unlistenRestartSuccessFn = await listen<{
+          meeting_id: string;
+        }>(
+          "audio-stream-restart-success",
+          (event) => {
+            console.log("Audio stream restart successful:", event.payload);
+            if (event.payload.meeting_id === activeMeetingId && isMounted) {
+              toast.success("Audio stream recovered", {
+                description: "Recording will continue automatically.",
+                duration: 5000,
+              });
+            }
+          }
+        );
+
+        // Listen for failed audio stream restart
+        const unlistenRestartFailedFn = await listen<{
+          meeting_id: string;
+          error: string;
+          attempts_remaining: number;
+        }>(
+          "audio-stream-restart-failed",
+          (event) => {
+            console.error("Audio stream restart failed:", event.payload);
+            if (event.payload.meeting_id === activeMeetingId && isMounted) {
+              if (event.payload.attempts_remaining > 0) {
+                toast.warning("Audio restart failed", {
+                  description: `${event.payload.attempts_remaining} attempts remaining. Will retry automatically.`,
+                  duration: 5000,
+                });
+              } else {
+                toast.error("Audio restart failed", {
+                  description: "No attempts remaining. Please restart the meeting manually.",
+                  duration: 10000,
+                });
+              }
+            }
+          }
+        );
+
         if (isMounted) {
           unlisten = unlistenFn;
+          unlistenWarning = unlistenWarningFn;
+          unlistenRestarting = unlistenRestartingFn;
+          unlistenRestartSuccess = unlistenRestartSuccessFn;
+          unlistenRestartFailed = unlistenRestartFailedFn;
         } else {
-          // Component unmounted before listener was set up
+          // Component unmounted before listeners were set up
           unlistenFn();
+          unlistenWarningFn();
+          unlistenRestartingFn();
+          unlistenRestartSuccessFn();
+          unlistenRestartFailedFn();
         }
       } catch (error) {
-        console.error("Failed to setup event listener:", error);
+        console.error("Failed to setup event listeners:", error);
       }
     };
 
-    setupListener();
+    setupListeners();
 
     return () => {
       isMounted = false;
-      if (unlisten) {
-        try {
-          unlisten();
-        } catch (error) {
-          console.error("Error cleaning up listener:", error);
+      const listeners = [
+        { fn: unlisten, name: "segment" },
+        { fn: unlistenWarning, name: "warning" },
+        { fn: unlistenRestarting, name: "restarting" },
+        { fn: unlistenRestartSuccess, name: "restart-success" },
+        { fn: unlistenRestartFailed, name: "restart-failed" },
+      ];
+
+      for (const { fn, name } of listeners) {
+        if (fn) {
+          try {
+            fn();
+          } catch (error) {
+            console.error(`Error cleaning up ${name} listener:`, error);
+          }
         }
       }
     };
@@ -159,7 +258,9 @@ export const MeetingView = () => {
 
   return (
     <div className="w-full max-w-4xl space-y-6">
-      <ImportAudio />
+      <div className="text-sm text-muted-foreground mb-4">
+        Start a live meeting to record and transcribe in real-time. For importing audio files or YouTube videos, use the Transcription section.
+      </div>
       <MeetingControls
         isActive={!!activeMeetingId}
         meetingName={meetingName}
@@ -186,9 +287,6 @@ export const MeetingView = () => {
           <div className="mt-6">
             <h3 className="mb-2 text-sm font-medium">Meeting Updates</h3>
             <MeetingUpdates meetingId={activeMeetingId} meetingName={meetingName} />
-          </div>
-          <div className="mt-6">
-            <GitHubActions meetingId={activeMeetingId} meetingName={meetingName} />
           </div>
         </>
       )}

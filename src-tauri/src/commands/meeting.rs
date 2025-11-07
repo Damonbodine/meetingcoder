@@ -1,9 +1,18 @@
 use crate::managers::meeting::{MeetingManager, MeetingSummary, TranscriptSegment};
-use crate::storage::transcript::TranscriptStorage;
+use crate::storage::transcript::{TranscriptStorage, TranscriptMetadata};
 use chrono::{DateTime, Local, TimeZone};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::State;
+
+/// Meeting history entry for the History UI
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MeetingHistoryEntry {
+    pub dir_name: String,
+    pub dir_path: String,
+    pub metadata: TranscriptMetadata,
+}
 
 #[tauri::command]
 pub async fn start_meeting(
@@ -118,4 +127,73 @@ pub fn get_transcript_dir_for(meeting_name: String, start_time: i64) -> Result<S
     let dir_name = format!("{}_{}", date_str, sanitized);
     let base = TranscriptStorage::default_path().map_err(|e| e.to_string())?;
     Ok(base.join(dir_name).to_string_lossy().to_string())
+}
+
+/// List all saved meeting transcripts
+#[tauri::command]
+pub fn list_saved_meetings() -> Result<Vec<MeetingHistoryEntry>, String> {
+    let storage = TranscriptStorage::with_default_path().map_err(|e| e.to_string())?;
+    let meeting_dirs = storage.list_meetings().map_err(|e| e.to_string())?;
+
+    let mut entries = Vec::new();
+    let base_path = TranscriptStorage::default_path().map_err(|e| e.to_string())?;
+
+    for dir_name in meeting_dirs {
+        match storage.load_transcript(&dir_name) {
+            Ok((metadata, _transcript)) => {
+                let dir_path = base_path.join(&dir_name);
+                entries.push(MeetingHistoryEntry {
+                    dir_name,
+                    dir_path: dir_path.to_string_lossy().to_string(),
+                    metadata,
+                });
+            }
+            Err(e) => {
+                log::warn!("Failed to load meeting {}: {}", dir_name, e);
+                // Skip corrupted meetings
+                continue;
+            }
+        }
+    }
+
+    Ok(entries)
+}
+
+/// Open a meeting folder in the file manager
+#[tauri::command]
+pub fn open_meeting_folder(dir_path: String) -> Result<(), String> {
+    use std::process::Command;
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(&dir_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open folder: {}", e))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer")
+            .arg(&dir_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open folder: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open")
+            .arg(&dir_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open folder: {}", e))?;
+    }
+
+    Ok(())
+}
+
+/// Delete a saved meeting transcript
+#[tauri::command]
+pub fn delete_saved_meeting(dir_name: String) -> Result<(), String> {
+    let storage = TranscriptStorage::with_default_path().map_err(|e| e.to_string())?;
+    storage.delete_transcript(&dir_name).map_err(|e| e.to_string())
 }
