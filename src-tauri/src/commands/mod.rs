@@ -7,6 +7,9 @@ pub mod transcription;
 pub mod automation;
 pub mod github;
 pub mod import;
+pub mod llm;
+pub mod codebase;
+pub mod prd;
 
 use crate::utils::cancel_current_operation;
 use tauri::{AppHandle, Manager};

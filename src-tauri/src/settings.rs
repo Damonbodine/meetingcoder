@@ -165,6 +165,10 @@ pub struct AppSettings {
     pub mute_while_recording: bool,
     #[serde(default = "default_transcription_chunk_seconds")]
     pub transcription_chunk_seconds: u32,
+    #[serde(default = "default_system_audio_buffer_seconds")]
+    pub system_audio_buffer_seconds: u32,
+    #[serde(default = "default_system_audio_silence_threshold")]
+    pub system_audio_silence_threshold: f32, // dBFS
     #[serde(default = "default_meeting_update_interval_seconds")]
     pub meeting_update_interval_seconds: u32,
     #[serde(default = "default_auto_trigger_meeting_command")]
@@ -183,6 +187,12 @@ pub struct AppSettings {
     pub github_branch_pattern: String,
     #[serde(default = "default_github_enabled")]
     pub github_enabled: bool,
+    #[serde(default = "default_github_auto_commit_push")]
+    pub github_auto_commit_push: bool,
+    #[serde(default = "default_github_auto_create_pr")]
+    pub github_auto_create_pr: bool,
+    #[serde(default = "default_github_auto_update_pr")]
+    pub github_auto_update_pr: bool,
     #[serde(default = "default_prefer_whisper_for_imports")]
     pub prefer_whisper_for_imports: bool,
     #[serde(default = "default_fast_import_mode_for_imports")]
@@ -193,6 +203,14 @@ pub struct AppSettings {
     pub min_segment_duration_for_imports: u32,
     #[serde(default = "default_ffmpeg_fallback_for_imports")]
     pub ffmpeg_fallback_for_imports: bool,
+    #[serde(default = "default_use_llm_summarization")]
+    pub use_llm_summarization: bool,
+    #[serde(default = "default_llm_model")]
+    pub llm_model: String,
+    #[serde(default = "default_use_queue_transcription")]
+    pub use_queue_transcription: bool,
+    #[serde(default = "default_queue_worker_count")]
+    pub queue_worker_count: u32,
 }
 
 fn default_model() -> String {
@@ -250,6 +268,12 @@ fn default_transcription_chunk_seconds() -> u32 {
     10
 }
 
+fn default_system_audio_silence_threshold() -> f32 { -50.0 }
+
+// Lower default buffer size to reduce RAM footprint and backlog risk.
+// 90s @ 16kHz mono float32 ≈ 5.8 MB
+fn default_system_audio_buffer_seconds() -> u32 { 90 }
+
 fn default_meeting_update_interval_seconds() -> u32 {
     20
 }
@@ -265,11 +289,18 @@ fn default_github_default_branch() -> String { "main".to_string() }
 fn default_github_branch_pattern() -> String { "meeting/{meeting_id}".to_string() }
 
 fn default_github_enabled() -> bool { false }
+fn default_github_auto_commit_push() -> bool { true }
+fn default_github_auto_create_pr() -> bool { true }
+fn default_github_auto_update_pr() -> bool { true }
 fn default_prefer_whisper_for_imports() -> bool { false }
 fn default_fast_import_mode_for_imports() -> bool { true }
 fn default_use_fixed_windows_for_imports() -> bool { false }
 fn default_min_segment_duration_for_imports() -> u32 { 10 }
 fn default_ffmpeg_fallback_for_imports() -> bool { true }
+fn default_use_llm_summarization() -> bool { false }
+fn default_llm_model() -> String { "claude-sonnet-4-5-20250929".to_string() }
+fn default_use_queue_transcription() -> bool { true }
+fn default_queue_worker_count() -> u32 { 2 }
 
 pub const SETTINGS_STORE_PATH: &str = "settings_store.json";
 
@@ -319,6 +350,8 @@ pub fn get_default_settings() -> AppSettings {
         clipboard_handling: ClipboardHandling::default(),
         mute_while_recording: false,
         transcription_chunk_seconds: default_transcription_chunk_seconds(),
+        system_audio_buffer_seconds: default_system_audio_buffer_seconds(),
+        system_audio_silence_threshold: default_system_audio_silence_threshold(),
         meeting_update_interval_seconds: default_meeting_update_interval_seconds(),
         auto_trigger_meeting_command: default_auto_trigger_meeting_command(),
         auto_accept_changes: default_auto_accept_changes(),
@@ -328,11 +361,18 @@ pub fn get_default_settings() -> AppSettings {
         github_default_branch: default_github_default_branch(),
         github_branch_pattern: default_github_branch_pattern(),
         github_enabled: default_github_enabled(),
+        github_auto_commit_push: default_github_auto_commit_push(),
+        github_auto_create_pr: default_github_auto_create_pr(),
+        github_auto_update_pr: default_github_auto_update_pr(),
         prefer_whisper_for_imports: default_prefer_whisper_for_imports(),
         fast_import_mode_for_imports: default_fast_import_mode_for_imports(),
         use_fixed_windows_for_imports: default_use_fixed_windows_for_imports(),
         min_segment_duration_for_imports: default_min_segment_duration_for_imports(),
         ffmpeg_fallback_for_imports: default_ffmpeg_fallback_for_imports(),
+        use_llm_summarization: default_use_llm_summarization(),
+        llm_model: default_llm_model(),
+        use_queue_transcription: default_use_queue_transcription(),
+        queue_worker_count: default_queue_worker_count(),
     }
 }
 

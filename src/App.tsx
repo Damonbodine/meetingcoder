@@ -7,6 +7,7 @@ import Footer from "./components/footer";
 import Onboarding from "./components/onboarding";
 import { Sidebar, SidebarSection, SECTIONS_CONFIG } from "./components/Sidebar";
 import { useSettings } from "./hooks/useSettings";
+import StatusBar from "./components/StatusBar";
 
 const renderSettingsContent = (section: SidebarSection) => {
   const ActiveComponent =
@@ -71,6 +72,19 @@ function App() {
 
   const activeLabel = SECTIONS_CONFIG[currentSection]?.label ?? "";
 
+  // Listen for navigation requests (from StatusBar toast action)
+  useEffect(() => {
+    const handler = (ev: Event) => {
+      const custom = ev as CustomEvent<string>;
+      const section = (custom.detail || "") as any;
+      if (section && SECTIONS_CONFIG[section as SidebarSection]) {
+        setCurrentSection(section as SidebarSection);
+      }
+    };
+    window.addEventListener("navigate-to-section", handler);
+    return () => window.removeEventListener("navigate-to-section", handler);
+  }, []);
+
   return (
     <div className="h-screen flex flex-col">
       <Toaster />
@@ -87,6 +101,7 @@ function App() {
             <h2 className="text-sm font-semibold tracking-wide uppercase opacity-80">
               {activeLabel}
             </h2>
+            <StatusBar />
           </div>
           <div className="flex-1 overflow-y-auto">
             <div className="flex flex-col items-center p-4 gap-4">

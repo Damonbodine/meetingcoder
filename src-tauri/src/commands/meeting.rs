@@ -1,4 +1,4 @@
-use crate::managers::meeting::{MeetingManager, MeetingSummary, TranscriptSegment};
+use crate::managers::meeting::{MeetingManager, MeetingStatus, MeetingSummary, TranscriptSegment};
 use crate::storage::transcript::{TranscriptStorage, TranscriptMetadata};
 use chrono::{DateTime, Local, TimeZone};
 use serde::{Deserialize, Serialize};
@@ -86,6 +86,30 @@ pub async fn get_active_meetings(
     meeting_manager: State<'_, Arc<MeetingManager>>,
 ) -> Result<Vec<String>, String> {
     Ok(meeting_manager.get_active_meetings().await)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MeetingInfo {
+    pub id: String,
+    pub name: String,
+    pub status: String,
+}
+
+#[tauri::command]
+pub async fn get_meeting_info(
+    meeting_id: String,
+    meeting_manager: State<'_, Arc<MeetingManager>>,
+) -> Result<MeetingInfo, String> {
+    let m = meeting_manager
+        .get_meeting(&meeting_id)
+        .await
+        .map_err(|e| format!("Failed to get meeting: {}", e))?;
+    let status = match m.status {
+        MeetingStatus::Recording => "recording",
+        MeetingStatus::Paused => "paused",
+        MeetingStatus::Completed => "completed",
+    };
+    Ok(MeetingInfo { id: m.id, name: m.name, status: status.to_string() })
 }
 
 #[tauri::command]

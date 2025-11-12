@@ -55,6 +55,9 @@ const DEFAULT_SETTINGS: Partial<Settings> = {
   history_limit: 5,
   mute_while_recording: false,
   transcription_chunk_seconds: 10,
+  // Lower default buffer size to reduce RAM/backlog by default
+  system_audio_buffer_seconds: 90,
+  system_audio_silence_threshold: -50,
   meeting_update_interval_seconds: 20,
   auto_trigger_meeting_command: false,
   auto_accept_changes: false,
@@ -121,6 +124,10 @@ const settingUpdaters: {
     invoke("change_mute_while_recording_setting", { enabled: value }),
   transcription_chunk_seconds: (value) =>
     invoke("change_transcription_chunk_seconds_setting", { seconds: value }),
+  system_audio_buffer_seconds: (value) =>
+    invoke("change_system_audio_buffer_seconds_setting", { seconds: value }),
+  system_audio_silence_threshold: (value) =>
+    invoke("change_system_audio_silence_threshold_setting", { dbfs: value }),
   meeting_update_interval_seconds: (value) =>
     invoke("change_meeting_update_interval_seconds_setting", { seconds: value }),
   auto_trigger_meeting_command: (value) =>

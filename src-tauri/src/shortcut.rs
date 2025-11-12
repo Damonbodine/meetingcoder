@@ -350,6 +350,48 @@ pub fn change_transcription_chunk_seconds_setting(
 }
 
 #[tauri::command]
+pub fn change_system_audio_silence_threshold_setting(
+    app: AppHandle,
+    dbfs: f32,
+) -> Result<(), String> {
+    // Clamp to a conservative range
+    let value = dbfs.clamp(-80.0, 0.0);
+    let mut s = settings::get_settings(&app);
+    s.system_audio_silence_threshold = value;
+    settings::write_settings(&app, s);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "system_audio_silence_threshold", "value": value }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn change_system_audio_buffer_seconds_setting(
+    app: AppHandle,
+    seconds: u32,
+) -> Result<(), String> {
+    // Clamp to a safe range (30s–600s)
+    let value = seconds.clamp(30, 600);
+    let mut s = settings::get_settings(&app);
+    s.system_audio_buffer_seconds = value;
+    settings::write_settings(&app, s.clone());
+
+    // Reconfigure buffer capacity via manager (restart if active)
+    if let Some(rm) = app.try_state::<std::sync::Arc<crate::managers::audio::AudioRecordingManager>>() {
+        if let Err(e) = rm.reconfigure_system_audio_buffer(value) {
+            eprintln!("Failed to reconfigure system audio buffer: {}", e);
+        }
+    }
+
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "system_audio_buffer_seconds", "value": value }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
 pub fn change_meeting_update_interval_seconds_setting(
     app: AppHandle,
     seconds: u32,

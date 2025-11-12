@@ -1,4 +1,4 @@
-use crate::integrations::github::{self, GitHubState, RepoInfo};
+use crate::integrations::github::{self, GitHubState, RepoInfo, DeviceCodeResponse};
 use crate::managers::meeting::MeetingManager;
 use crate::settings;
 use std::sync::Arc;
@@ -407,4 +407,20 @@ pub async fn post_meeting_update_comment(
         .map_err(|e| e.to_string())?;
 
     Ok(true)
+}
+
+/// Begin GitHub OAuth Device Flow
+#[tauri::command]
+pub async fn github_begin_device_auth() -> Result<DeviceCodeResponse, String> {
+    github::begin_device_auth()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Poll for GitHub OAuth Device Flow token
+#[tauri::command]
+pub async fn github_poll_device_token(device_code: String) -> Result<Option<String>, String> {
+    github::poll_device_token(&device_code)
+        .await
+        .map_err(|e| e.to_string())
 }

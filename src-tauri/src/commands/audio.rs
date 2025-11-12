@@ -215,3 +215,80 @@ pub fn clear_system_audio_buffer(app: AppHandle) -> Result<(), String> {
     rm.clear_system_audio_buffer();
     Ok(())
 }
+
+#[derive(Serialize)]
+pub struct AudioMetrics {
+    buffer_size_samples: usize,
+    buffer_capacity_samples: usize,
+    buffer_fill_percent: f32,
+    overwritten_samples: u64,
+    device_name: String,
+    device_sample_rate: u32,
+    resample_ratio: f32,
+    silent_chunks: u64,
+    restart_attempts_total: u64,
+    restarts_last_hour: u64,
+    restart_cooldown_remaining_secs: u64,
+    restart_successes: u64,
+    last_restart_error: Option<String>,
+    // New diagnostics
+    is_system_capturing: bool,
+    backlog_seconds_estimate: f32,
+    queue_queued: i64,
+    queue_processing: i64,
+    queue_backlog_seconds: f32,
+}
+
+#[tauri::command]
+pub fn get_audio_metrics(app: AppHandle) -> Result<AudioMetrics, String> {
+    let rm = app.state::<Arc<AudioRecordingManager>>();
+    let size = rm.get_system_audio_buffer_size();
+    let cap = rm.get_system_audio_buffer_capacity();
+    let percent = if cap > 0 { (size as f32 / cap as f32) * 100.0 } else { 0.0 };
+    let overwritten = rm.get_system_audio_overwritten_count();
+    let dev_rate = rm.get_device_sample_rate();
+    let ratio = rm.get_resample_ratio();
+    let silent = rm.get_silent_chunks_count();
+    let r_attempts = rm.get_restart_attempts_total();
+    let r_last_hour = rm.get_restart_attempts_last_hour();
+    let cooldown_secs = rm.get_restart_cooldown_remaining_secs();
+    let r_success = rm.get_restart_successes();
+    let r_error = rm.get_last_restart_error();
+    let device_name = rm.get_current_device_name();
+    let is_capturing = rm.is_system_audio_capturing();
+    let backlog_secs_estimate = size as f32 / 16_000.0; // mono 16kHz
+    // Queue metrics
+    let (q_queued, q_processing, q_backlog_secs) = if let Some(q) = app.try_state::<Arc<crate::queue::Queue>>() {
+        match (q.counts(), q.backlog_seconds()) {
+            (Ok((a,b,_)), Ok(backlog)) => (a,b,backlog),
+            _ => (0,0,0.0)
+        }
+    } else { (0,0,0.0) };
+
+    Ok(AudioMetrics {
+        buffer_size_samples: size,
+        buffer_capacity_samples: cap,
+        buffer_fill_percent: percent,
+        overwritten_samples: overwritten,
+        device_name,
+        device_sample_rate: dev_rate,
+        resample_ratio: ratio,
+        silent_chunks: silent,
+        restart_attempts_total: r_attempts,
+        restarts_last_hour: r_last_hour,
+        restart_cooldown_remaining_secs: cooldown_secs,
+        restart_successes: r_success,
+        last_restart_error: r_error,
+        is_system_capturing: is_capturing,
+        backlog_seconds_estimate: backlog_secs_estimate,
+        queue_queued: q_queued,
+        queue_processing: q_processing,
+        queue_backlog_seconds: q_backlog_secs,
+    })
+}
+
+#[tauri::command]
+pub fn get_audio_errors(app: AppHandle) -> Result<Vec<String>, String> {
+    let rm = app.state::<Arc<AudioRecordingManager>>();
+    Ok(rm.get_recent_audio_errors())
+}

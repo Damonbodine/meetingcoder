@@ -11,6 +11,8 @@ import { UseFixedWindowsForImports } from "./UseFixedWindowsForImports";
 import { MinSegmentDurationForImports } from "./MinSegmentDurationForImports";
 import { UseFfmpegFallbackForImports } from "./UseFfmpegFallbackForImports";
 import { AutostartToggle } from "./AutostartToggle";
+import { SystemAudioSilenceThreshold } from "./SystemAudioSilenceThreshold";
+import { SystemAudioBufferSeconds } from "./SystemAudioBufferSeconds";
 
 export const AdvancedSettings: React.FC = () => {
   return (
@@ -27,6 +29,8 @@ export const AdvancedSettings: React.FC = () => {
         <UseFixedWindowsForImports descriptionMode="tooltip" />
         <MinSegmentDurationForImports descriptionMode="tooltip" />
         <UseFfmpegFallbackForImports descriptionMode="tooltip" />
+        <SystemAudioSilenceThreshold descriptionMode="tooltip" />
+        <SystemAudioBufferSeconds descriptionMode="tooltip" />
       </SettingsGroup>
     </div>
   );

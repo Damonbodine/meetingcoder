@@ -17,6 +17,9 @@ mod utils;
 mod automation;
 mod integrations;
 mod codebase;
+mod queue;
+mod workers;
+mod document_generation;
 
 use managers::audio::AudioRecordingManager;
 use managers::history::HistoryManager;
@@ -79,6 +82,14 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         MeetingManager::new(app_handle, recording_manager.clone(), transcription_manager.clone())
             .expect("Failed to initialize meeting manager"),
     );
+
+    // Initialize durable audio queue and ASR worker(s)
+    let queue = queue::Queue::new(app_handle).expect("Failed to initialize audio queue");
+    app_handle.manage(queue.clone());
+    let worker_count = settings::get_settings(app_handle).queue_worker_count.clamp(1, 8);
+    for _ in 0..worker_count {
+        workers::asr_worker::spawn(queue.clone(), meeting_manager.clone(), transcription_manager.clone(), app_handle.clone());
+    }
 
     // Add managers to Tauri's managed state
     app_handle.manage(recording_manager.clone());
@@ -254,6 +265,8 @@ pub fn run() {
             shortcut::resume_binding,
             shortcut::change_mute_while_recording_setting,
             shortcut::change_meeting_update_interval_seconds_setting,
+            shortcut::change_system_audio_silence_threshold_setting,
+            shortcut::change_system_audio_buffer_seconds_setting,
             shortcut::change_auto_trigger_meeting_command_setting,
             shortcut::change_auto_accept_changes_setting,
             shortcut::change_auto_trigger_min_interval_seconds_setting,
@@ -298,6 +311,8 @@ pub fn run() {
             commands::audio::get_system_audio_buffer_size,
             commands::audio::save_system_audio_buffer_to_wav,
             commands::audio::clear_system_audio_buffer,
+            commands::audio::get_audio_metrics,
+            commands::audio::get_audio_errors,
             commands::transcription::set_model_unload_timeout,
             commands::transcription::get_model_load_status,
             commands::transcription::unload_model_manually,
@@ -313,6 +328,7 @@ pub fn run() {
             commands::meeting::get_live_transcript,
             commands::meeting::update_speaker_labels,
             commands::meeting::get_active_meetings,
+            commands::meeting::get_meeting_info,
             commands::meeting::get_meeting_project_path,
             commands::meeting::get_transcript_dir_for,
             commands::meeting::list_saved_meetings,
@@ -349,7 +365,16 @@ pub fn run() {
             commands::system_audio::is_system_audio_supported,
             commands::system_audio::get_system_audio_setup_instructions,
             commands::system_audio::detect_virtual_audio_device,
-            commands::system_audio::list_system_audio_devices
+            commands::system_audio::list_system_audio_devices,
+            commands::prd::generate_prd_now,
+            commands::prd::get_prd_versions,
+            commands::prd::get_prd_content,
+            commands::prd::get_prd_content_json,
+            commands::prd::get_prd_changelog,
+            commands::prd::get_prd_change,
+            commands::prd::export_prd,
+            commands::prd::get_prd_metadata,
+            commands::prd::delete_prd_version
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

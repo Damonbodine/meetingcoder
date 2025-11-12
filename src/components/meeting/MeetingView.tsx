@@ -5,6 +5,7 @@ import { MeetingControls } from "./MeetingControls";
 import { LiveTranscript } from "./LiveTranscript";
 import { MeetingUpdates } from "./MeetingUpdates";
 import { MeetingChecklist } from "./MeetingChecklist";
+import { AudioSetupSection } from "./AudioSetupSection";
 import { TranscriptSegment, MeetingSummary } from "../../lib/types";
 import { toast } from "sonner";
 
@@ -14,6 +15,33 @@ export const MeetingView = () => {
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
   const [isStarting, setIsStarting] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
+
+  // Reattach to an active meeting if user navigates away and back
+  useEffect(() => {
+    let cancelled = false;
+    const reattach = async () => {
+      try {
+        const active = await invoke<string[]>("get_active_meetings");
+        if (cancelled) return;
+        if (active && active.length > 0) {
+          const id = active[0];
+          const info = await invoke<any>("get_meeting_info", { meetingId: id });
+          if (cancelled) return;
+          setActiveMeetingId(id);
+          setMeetingName(info?.name || "");
+          // Optionally fetch current transcript so UI shows existing lines
+          try {
+            const segments = await invoke<TranscriptSegment[]>("get_live_transcript", { meetingId: id });
+            if (!cancelled) setTranscriptSegments(segments || []);
+          } catch (_) { /* ignore */ }
+        }
+      } catch (_) {
+        // ignore
+      }
+    };
+    reattach();
+    return () => { cancelled = true; };
+  }, []);
 
   // Listen for new transcript segments
   useEffect(() => {
@@ -177,16 +205,15 @@ export const MeetingView = () => {
         (typeof audioSource === "object" && audioSource.SystemAudio);
 
       if (!isSystemAudio) {
-        toast.error("Please set audio source to BlackHole first", {
-          description: "Go to Debug > System Audio Testing",
+        toast.error("Please select BlackHole as audio source", {
+          description: "Use the 'Audio Setup' section above to configure system audio capture",
+          duration: 5000,
         });
         setIsStarting(false);
         return;
       }
 
-      const meetingId = await invoke<string>("start_meeting", {
-        meetingName: name,
-      });
+      const meetingId = await invoke<string>("start_meeting", { meetingName: name });
 
       setActiveMeetingId(meetingId);
       setTranscriptSegments([]);
@@ -261,6 +288,15 @@ export const MeetingView = () => {
       <div className="text-sm text-muted-foreground mb-4">
         Start a live meeting to record and transcribe in real-time. For importing audio files or YouTube videos, use the Transcription section.
       </div>
+
+      {/* Audio Setup Section - Prominent at top */}
+      {!activeMeetingId && (
+        <div className="mb-6">
+          <h3 className="text-base font-semibold mb-3">Audio Setup</h3>
+          <AudioSetupSection />
+        </div>
+      )}
+
       <MeetingControls
         isActive={!!activeMeetingId}
         meetingName={meetingName}

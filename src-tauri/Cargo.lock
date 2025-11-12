@@ -3413,9 +3413,11 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.17",
  "tokio",
+ "toml 0.8.2",
  "transcribe-rs",
  "uuid",
  "vad-rs",
+ "walkdir",
 ]
 
 [[package]]

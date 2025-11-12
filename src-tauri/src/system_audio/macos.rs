@@ -281,7 +281,7 @@ impl MacOSSystemAudio {
                 }
             },
             |err| {
-                eprintln!("Stream error: {}", err);
+                log::error!("Audio stream error: {}. This may cause transcription to stop. Try restarting the meeting.", err);
             },
             None,
         )?;

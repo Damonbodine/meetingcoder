@@ -438,7 +438,7 @@ fn build_vad_segments(app: &AppHandle, samples: &[f32], min_segment_seconds: u32
     let mut merged: Vec<(usize, usize)> = Vec::new();
     for (s, e) in segments.into_iter() {
         if s >= e { continue; }
-        if let Some((ps, pe)) = merged.last_mut() {
+        if let Some((_ps, pe)) = merged.last_mut() {
             if s.saturating_sub(*pe) < 1600 { // merge small gaps (<0.1s)
                 *pe = (*pe).max(e);
                 continue;

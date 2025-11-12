@@ -613,3 +613,90 @@ pub fn generate_branch_name(pattern: &str, meeting_id: &str, meeting_name: &str)
         .replace("{meeting_id}", meeting_id)
         .replace("{meeting_name}", &sanitized_name)
 }
+
+// ===== OAuth Device Flow =====
+
+const GITHUB_CLIENT_ID: &str = "Ov23liUutHAz1Qx5xvSy"; // MeetingCoder app client ID
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DeviceCodeResponse {
+    pub device_code: String,
+    pub user_code: String,
+    pub verification_uri: String,
+    pub expires_in: u32,
+    pub interval: u32,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct DeviceTokenResponse {
+    pub access_token: String,
+    pub token_type: String,
+    pub scope: String,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(untagged)]
+pub enum DeviceTokenPollResponse {
+    Success(DeviceTokenResponse),
+    Error { error: String },
+}
+
+/// Initiate OAuth Device Flow
+pub async fn begin_device_auth() -> Result<DeviceCodeResponse> {
+    let client = reqwest::Client::new();
+
+    let mut params = std::collections::HashMap::new();
+    params.insert("client_id", GITHUB_CLIENT_ID);
+    params.insert("scope", "repo");
+
+    let response = client
+        .post("https://github.com/login/device/code")
+        .header("Accept", "application/json")
+        .form(&params)
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        let error_text = response.text().await?;
+        return Err(anyhow!("Device auth failed: {}", error_text));
+    }
+
+    let device_code: DeviceCodeResponse = response.json().await?;
+    log::info!("GITHUB device auth initiated: {}", device_code.user_code);
+
+    Ok(device_code)
+}
+
+/// Poll for OAuth Device Flow token
+pub async fn poll_device_token(device_code: &str) -> Result<Option<String>> {
+    let client = reqwest::Client::new();
+
+    let mut params = std::collections::HashMap::new();
+    params.insert("client_id", GITHUB_CLIENT_ID);
+    params.insert("device_code", device_code);
+    params.insert("grant_type", "urn:ietf:params:oauth:grant-type:device_code");
+
+    let response = client
+        .post("https://github.com/login/oauth/access_token")
+        .header("Accept", "application/json")
+        .form(&params)
+        .send()
+        .await?;
+
+    let poll_response: DeviceTokenPollResponse = response.json().await?;
+
+    match poll_response {
+        DeviceTokenPollResponse::Success(token) => {
+            log::info!("GITHUB device token received");
+            Ok(Some(token.access_token))
+        },
+        DeviceTokenPollResponse::Error { error } => {
+            if error == "authorization_pending" || error == "slow_down" {
+                // User hasn't authorized yet, return None to continue polling
+                Ok(None)
+            } else {
+                Err(anyhow!("Device token poll error: {}", error))
+            }
+        }
+    }
+}

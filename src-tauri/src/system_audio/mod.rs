@@ -42,6 +42,8 @@ mod linux;
 
 // Sendable wrapper for thread-safe audio capture
 mod sendable;
+// Lock-free SPSC ring buffer for system audio samples
+pub mod ring_buffer;
 
 // Re-export platform-specific implementation as SystemAudioCapture
 #[cfg(target_os = "macos")]

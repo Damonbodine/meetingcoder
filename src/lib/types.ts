@@ -67,6 +67,9 @@ export const SettingsSchema = z.object({
   clipboard_handling: ClipboardHandlingSchema.optional().default("dont_modify"),
   mute_while_recording: z.boolean().optional().default(false),
   transcription_chunk_seconds: z.number().optional().default(10),
+  // Default to 90 seconds to keep memory modest and reduce backlog risk
+  system_audio_buffer_seconds: z.number().optional().default(90),
+  system_audio_silence_threshold: z.number().optional().default(-50),
   meeting_update_interval_seconds: z.number().optional().default(20),
   auto_trigger_meeting_command: z.boolean().optional().default(false),
   auto_accept_changes: z.boolean().optional().default(false),

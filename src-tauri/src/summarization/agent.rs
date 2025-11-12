@@ -43,6 +43,9 @@ pub struct SummarizationOutput {
     pub modified_features: Option<HashMap<String, serde_json::Value>>, // Partial<Feature>
     #[serde(skip_serializing_if = "Option::is_none")]
     pub clarifications: Option<HashMap<String, String>>,
+    // Code-aware: files mentioned in transcript
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub target_files: Vec<String>,
 }
 
 fn contains_any(haystack: &str, needles: &[&str]) -> bool {
@@ -227,5 +230,6 @@ pub fn summarize_segments_with_context(
         new_features_structured,
         modified_features: None,
         clarifications: None,
+        target_files: Vec::new(),  // Will be populated by LLM or file extraction logic
     }
 }
