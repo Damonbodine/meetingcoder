@@ -1,0 +1,53 @@
+Add PRD Generator System + Fix Compilation Errors
+
+## New Features
+
+### PRD (Product Requirements Document) Generator
+Complete autonomous PRD generation system that transforms meeting transcripts into structured, versioned product requirements documents.
+
+**New Modules** (src-tauri/src/document_generation/):
+- types.rs: Data structures (PRDContent, UserStory, Requirement, etc.)
+- prd_generator.rs: Main orchestration with LLM integration
+- prd_template.rs: Markdown rendering engine
+- prd_storage.rs: File I/O and versioning system
+- prd_analyzer.rs: Change detection between versions
+
+**New Commands** (commands/prd.rs):
+- generate_prd_now: Manual PRD generation
+- get_prd_versions: List all versions
+- get_prd_content: Get markdown/JSON for versions
+- get_prd_changelog: Get change history
+- export_prd: Export to markdown/PDF/HTML
+
+**Key Capabilities**:
+- Automatic PRD generation (initial, incremental, final)
+- LLM-powered extraction with heuristic fallback
+- Version tracking with detailed changelog
+- Links requirements to transcript segments
+- Structured sections: Executive Summary, User Stories, Requirements,
+  Technical Specs, Acceptance Criteria, Dependencies, Risks, Timeline
+
+**Storage**: ~/.handy/meetings/{meeting_id}/prds/
+- Versioned markdown + JSON files
+- Complete changelog tracking
+- Metadata for each version
+
+## Bug Fixes
+
+### Compilation Errors (Pre-existing)
+- Fixed variable naming in src/commands/import.rs (lines 222-223)
+  - Removed incorrect underscore prefixes from total_audio_sec_processed
+    and total_wall_sec_transcribing
+- Fixed ownership issue in src/workers/asr_worker.rs (line 62)
+  - Added .clone() to samples before passing to transcribe()
+
+## Documentation
+- Added comprehensive design document: docs/prd/PRD_GENERATOR_DESIGN.md
+  - Complete architecture overview
+  - Data structures and prompts
+  - Integration strategy
+  - Testing approach
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
