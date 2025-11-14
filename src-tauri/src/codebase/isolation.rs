@@ -133,8 +133,7 @@ pub fn generate_claudeignore(project_path: &Path, framework: Option<&str>) -> Re
     }
 
     let content = patterns.join("\n");
-    fs::write(&claudeignore_path, content)
-        .context("Failed to write .claudeignore file")?;
+    fs::write(&claudeignore_path, content).context("Failed to write .claudeignore file")?;
 
     log::info!("Generated .claudeignore at {:?}", claudeignore_path);
     Ok(())
@@ -158,16 +157,13 @@ pub fn is_safe_path(project_path: &Path, target_path: &Path) -> bool {
 
 /// Returns the safe experiments directory for a meeting
 pub fn get_experiments_dir(project_path: &Path, meeting_id: &str) -> PathBuf {
-    project_path
-        .join("experiments")
-        .join(meeting_id)
+    project_path.join("experiments").join(meeting_id)
 }
 
 /// Creates the experiments directory for a meeting
 pub fn create_experiments_dir(project_path: &Path, meeting_id: &str) -> Result<PathBuf> {
     let experiments_dir = get_experiments_dir(project_path, meeting_id);
-    fs::create_dir_all(&experiments_dir)
-        .context("Failed to create experiments directory")?;
+    fs::create_dir_all(&experiments_dir).context("Failed to create experiments directory")?;
 
     // Create a README to explain the purpose
     let readme_path = experiments_dir.join("README.md");
@@ -194,8 +190,7 @@ pub fn create_experiments_dir(project_path: &Path, meeting_id: &str) -> Result<P
         meeting_id
     );
 
-    fs::write(&readme_path, readme_content)
-        .context("Failed to write experiments README")?;
+    fs::write(&readme_path, readme_content).context("Failed to write experiments README")?;
 
     // Create subdirectories
     fs::create_dir_all(experiments_dir.join("src"))?;
@@ -311,8 +306,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let project_path = temp_dir.path();
 
-        let experiments_dir =
-            create_experiments_dir(project_path, "test-meeting").unwrap();
+        let experiments_dir = create_experiments_dir(project_path, "test-meeting").unwrap();
 
         assert!(experiments_dir.exists());
         assert!(experiments_dir.join("README.md").exists());
@@ -329,11 +323,7 @@ mod tests {
         fs::create_dir_all(&experiments_dir).unwrap();
 
         let target = experiments_dir.join("code.ts");
-        let result = validate_file_operation(
-            project_path,
-            &target,
-            FileOperation::Create,
-        );
+        let result = validate_file_operation(project_path, &target, FileOperation::Create);
 
         assert!(result.is_ok());
     }
@@ -345,11 +335,7 @@ mod tests {
         fs::create_dir_all(project_path.join("src")).unwrap();
 
         let target = project_path.join("src/app.ts");
-        let result = validate_file_operation(
-            project_path,
-            &target,
-            FileOperation::Create,
-        );
+        let result = validate_file_operation(project_path, &target, FileOperation::Create);
 
         assert!(result.is_err());
         assert!(result

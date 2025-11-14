@@ -1,22 +1,11 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::path::Path;
 use std::process::Command;
-use std::fs;
-use std::env;
 
 const KEYCHAIN_SERVICE: &str = "com.handy.github";
 const KEYCHAIN_ACCOUNT: &str = "github_token";
-
-// Fallback token storage path for when keyring fails (development mode)
-fn get_token_fallback_path() -> Result<std::path::PathBuf> {
-    let home = env::var("HOME")
-        .or_else(|_| env::var("USERPROFILE"))
-        .map_err(|_| anyhow!("Could not determine home directory"))?;
-    let config_dir = Path::new(&home).join(".handy");
-    fs::create_dir_all(&config_dir)?;
-    Ok(config_dir.join(".github-token"))
-}
 
 /// GitHub integration state persisted to .claude/.github-state.json
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
@@ -137,94 +126,46 @@ pub fn ensure_local_repo_clone(owner: &str, repo: &str, token: &str) -> Result<S
 pub fn store_github_token(token: &str) -> Result<()> {
     log::info!("GITHUB attempting to store token (length: {})", token.len());
 
-    // Try keyring first
-    let keyring_result = (|| -> Result<()> {
-        let entry = keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
-            .map_err(|e| anyhow!("Failed to create keyring entry: {}", e))?;
+    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
+        .map_err(|e| anyhow!("Failed to create keyring entry: {}", e))?;
 
-        entry.set_password(token)
-            .map_err(|e| anyhow!("Failed to set password in keyring: {}", e))?;
+    entry
+        .set_password(token)
+        .map_err(|e| anyhow!("Failed to set password in keyring: {}", e))?;
 
-        log::info!("GITHUB token stored in system keyring");
+    // Verify round-trip to detect locked keychain scenarios early
+    entry
+        .get_password()
+        .map_err(|e| anyhow!("Verification failed after storing token: {}", e))?;
 
-        // Verify we can read it back
-        entry.get_password()
-            .map_err(|e| anyhow!("Verification failed: {}", e))?;
-
-        log::info!("GITHUB token verified in keyring");
-        Ok(())
-    })();
-
-    match keyring_result {
-        Ok(_) => {
-            log::info!("GITHUB token stored successfully via keyring");
-            // Also store in fallback for reliability
-            if let Ok(path) = get_token_fallback_path() {
-                let _ = fs::write(&path, token);
-                log::info!("GITHUB token also stored in fallback location");
-            }
-            Ok(())
-        }
-        Err(e) => {
-            log::warn!("GITHUB keyring storage failed: {}, using fallback", e);
-            // Use fallback storage
-            let path = get_token_fallback_path()?;
-            fs::write(&path, token)?;
-            log::info!("GITHUB token stored in fallback location: {:?}", path);
-            Ok(())
-        }
-    }
+    log::info!("GITHUB token stored in system keyring");
+    Ok(())
 }
 
-/// Retrieve GitHub token from keyring with fallback
+/// Retrieve GitHub token from keyring only
 pub fn get_github_token() -> Result<String> {
     log::info!("GITHUB attempting to retrieve token");
 
-    // Try keyring first
-    let keyring_result = (|| -> Result<String> {
-        let entry = keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
-            .map_err(|e| anyhow!("Failed to create keyring entry: {}", e))?;
+    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
+        .map_err(|e| anyhow!("Failed to create keyring entry: {}", e))?;
 
-        let token = entry.get_password()
-            .map_err(|e| anyhow!("Failed to get password from keyring: {}", e))?;
+    let token = entry
+        .get_password()
+        .map_err(|e| anyhow!("Failed to get password from keyring: {}", e))?;
 
-        log::info!("GITHUB token retrieved from keyring (length: {})", token.len());
-        Ok(token)
-    })();
-
-    match keyring_result {
-        Ok(token) => Ok(token),
-        Err(e) => {
-            log::warn!("GITHUB keyring retrieval failed: {}, trying fallback", e);
-            // Try fallback
-            let path = get_token_fallback_path()?;
-            if path.exists() {
-                let token = fs::read_to_string(&path)?;
-                log::info!("GITHUB token retrieved from fallback (length: {})", token.len());
-                Ok(token)
-            } else {
-                Err(anyhow!("No token found in keyring or fallback"))
-            }
-        }
-    }
+    log::info!(
+        "GITHUB token retrieved from keyring (length: {})",
+        token.len()
+    );
+    Ok(token)
 }
 
-/// Delete GitHub token from keyring and fallback
+/// Delete GitHub token from keyring
 pub fn delete_github_token() -> Result<()> {
-    // Try to delete from keyring
     if let Ok(entry) = keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT) {
         let _ = entry.delete_credential();
         log::info!("GITHUB token removed from keyring");
     }
-
-    // Also delete fallback
-    if let Ok(path) = get_token_fallback_path() {
-        if path.exists() {
-            fs::remove_file(&path)?;
-            log::info!("GITHUB token removed from fallback");
-        }
-    }
-
     Ok(())
 }
 
@@ -239,17 +180,11 @@ pub async fn test_github_connection(token: &str) -> Result<String> {
         .await?;
 
     if !response.status().is_success() {
-        return Err(anyhow!(
-            "GitHub API error: {}",
-            response.status()
-        ));
+        return Err(anyhow!("GitHub API error: {}", response.status()));
     }
 
     let user_data: serde_json::Value = response.json().await?;
-    let username = user_data["login"]
-        .as_str()
-        .unwrap_or("unknown")
-        .to_string();
+    let username = user_data["login"].as_str().unwrap_or("unknown").to_string();
 
     log::info!("GITHUB connection test successful for user: {}", username);
     Ok(username)
@@ -311,10 +246,7 @@ pub async fn get_repo_info(token: &str, owner: &str, repo: &str) -> Result<serde
         .await?;
 
     if !response.status().is_success() {
-        return Err(anyhow!(
-            "Failed to get repo info: {}",
-            response.status()
-        ));
+        return Err(anyhow!("Failed to get repo info: {}", response.status()));
     }
 
     let repo_data: serde_json::Value = response.json().await?;
@@ -419,10 +351,7 @@ pub fn push_to_remote(
     repo: &str,
 ) -> Result<()> {
     // Set up remote URL with token authentication
-    let remote_url = format!(
-        "https://{}@github.com/{}/{}.git",
-        token, owner, repo
-    );
+    let remote_url = format!("https://{}@github.com/{}/{}.git", token, owner, repo);
 
     // Use git command for push (simpler authentication)
     let output = Command::new("git")
@@ -473,11 +402,7 @@ pub async fn create_pull_request(
     if !response.status().is_success() {
         let status = response.status();
         let error_text = response.text().await?;
-        return Err(anyhow!(
-            "Failed to create PR ({}): {}",
-            status,
-            error_text
-        ));
+        return Err(anyhow!("Failed to create PR ({}): {}", status, error_text));
     }
 
     let pr: GitHubPR = response.json().await?;
@@ -517,11 +442,7 @@ pub async fn update_pull_request(
     if !response.status().is_success() {
         let status = response.status();
         let error_text = response.text().await?;
-        return Err(anyhow!(
-            "Failed to update PR ({}): {}",
-            status,
-            error_text
-        ));
+        return Err(anyhow!("Failed to update PR ({}): {}", status, error_text));
     }
 
     let pr: GitHubPR = response.json().await?;
@@ -590,10 +511,7 @@ pub async fn get_prs_for_branch(
         .await?;
 
     if !response.status().is_success() {
-        return Err(anyhow!(
-            "Failed to get PRs: {}",
-            response.status()
-        ));
+        return Err(anyhow!("Failed to get PRs: {}", response.status()));
     }
 
     let prs: Vec<GitHubPR> = response.json().await?;
@@ -689,7 +607,7 @@ pub async fn poll_device_token(device_code: &str) -> Result<Option<String>> {
         DeviceTokenPollResponse::Success(token) => {
             log::info!("GITHUB device token received");
             Ok(Some(token.access_token))
-        },
+        }
         DeviceTokenPollResponse::Error { error } => {
             if error == "authorization_pending" || error == "slow_down" {
                 // User hasn't authorized yet, return None to continue polling

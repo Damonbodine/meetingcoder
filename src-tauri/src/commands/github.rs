@@ -1,4 +1,4 @@
-use crate::integrations::github::{self, GitHubState, RepoInfo, DeviceCodeResponse};
+use crate::integrations::github::{self, DeviceCodeResponse, GitHubState, RepoInfo};
 use crate::managers::meeting::MeetingManager;
 use crate::settings;
 use std::sync::Arc;
@@ -40,9 +40,21 @@ pub struct PRResult {
     pub error: Option<String>,
 }
 
+fn ensure_github_allowed(app: &AppHandle) -> Result<(), String> {
+    let settings = settings::get_settings(app);
+    if !settings.advanced_features_enabled {
+        return Err("GitHub integrations require Advanced Automations to be enabled.".to_string());
+    }
+    if settings.offline_mode_enabled {
+        return Err("Offline mode is enabled. Disable it to use GitHub features.".to_string());
+    }
+    Ok(())
+}
+
 /// Store GitHub token securely
 #[tauri::command]
-pub async fn set_github_token(token: String) -> Result<bool, String> {
+pub async fn set_github_token(app: AppHandle, token: String) -> Result<bool, String> {
+    ensure_github_allowed(&app)?;
     github::store_github_token(&token).map_err(|e| e.to_string())?;
     Ok(true)
 }
@@ -56,7 +68,8 @@ pub async fn remove_github_token() -> Result<bool, String> {
 
 /// Test GitHub connection with current token
 #[tauri::command]
-pub async fn test_github_connection() -> Result<GitHubConnectionTest, String> {
+pub async fn test_github_connection(app: AppHandle) -> Result<GitHubConnectionTest, String> {
+    ensure_github_allowed(&app)?;
     match github::get_github_token() {
         Ok(token) => match github::test_github_connection(&token).await {
             Ok(username) => Ok(GitHubConnectionTest {
@@ -80,7 +93,8 @@ pub async fn test_github_connection() -> Result<GitHubConnectionTest, String> {
 
 /// List user's GitHub repositories
 #[tauri::command]
-pub async fn list_github_repos() -> Result<Vec<RepoInfo>, String> {
+pub async fn list_github_repos(app: AppHandle) -> Result<Vec<RepoInfo>, String> {
+    ensure_github_allowed(&app)?;
     let token = github::get_github_token().map_err(|e| format!("No GitHub token: {}", e))?;
     github::list_user_repos(&token)
         .await
@@ -176,6 +190,7 @@ pub async fn push_meeting_changes(
     commit_message: Option<String>,
     meeting_manager: State<'_, Arc<MeetingManager>>,
 ) -> Result<PushResult, String> {
+    ensure_github_allowed(&app)?;
     let settings = settings::get_settings(&app);
 
     // Validate settings
@@ -206,11 +221,8 @@ pub async fn push_meeting_changes(
     let repo_obj = github::init_git_repo(project_path).map_err(|e| e.to_string())?;
 
     // Generate branch name
-    let branch_name = github::generate_branch_name(
-        &settings.github_branch_pattern,
-        &meeting_id,
-        &meeting.name,
-    );
+    let branch_name =
+        github::generate_branch_name(&settings.github_branch_pattern, &meeting_id, &meeting.name);
 
     // Check if we need to create branch
     let current_branch = github::get_current_branch(&repo_obj).unwrap_or_default();
@@ -257,6 +269,7 @@ pub async fn create_or_update_pr(
     body: Option<String>,
     meeting_manager: State<'_, Arc<MeetingManager>>,
 ) -> Result<PRResult, String> {
+    ensure_github_allowed(&app)?;
     let settings = settings::get_settings(&app);
 
     // Validate settings
@@ -287,11 +300,8 @@ pub async fn create_or_update_pr(
     let mut github_state = github::read_github_state(project_path);
 
     // Generate branch name
-    let branch_name = github::generate_branch_name(
-        &settings.github_branch_pattern,
-        &meeting_id,
-        &meeting.name,
-    );
+    let branch_name =
+        github::generate_branch_name(&settings.github_branch_pattern, &meeting_id, &meeting.name);
 
     // Generate PR title and body
     let pr_title = title.unwrap_or_else(|| format!("Meeting: {}", meeting.name));
@@ -303,10 +313,9 @@ pub async fn create_or_update_pr(
     });
 
     // Check if PR already exists for this branch
-    let existing_prs =
-        github::get_prs_for_branch(&token, owner, repo, &branch_name)
-            .await
-            .map_err(|e| e.to_string())?;
+    let existing_prs = github::get_prs_for_branch(&token, owner, repo, &branch_name)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let pr = if let Some(existing_pr) = existing_prs.first() {
         // Update existing PR
@@ -356,6 +365,7 @@ pub async fn post_meeting_update_comment(
     comment: Option<String>,
     meeting_manager: State<'_, Arc<MeetingManager>>,
 ) -> Result<bool, String> {
+    ensure_github_allowed(&app)?;
     let settings = settings::get_settings(&app);
 
     // Validate settings
@@ -411,15 +421,18 @@ pub async fn post_meeting_update_comment(
 
 /// Begin GitHub OAuth Device Flow
 #[tauri::command]
-pub async fn github_begin_device_auth() -> Result<DeviceCodeResponse, String> {
-    github::begin_device_auth()
-        .await
-        .map_err(|e| e.to_string())
+pub async fn github_begin_device_auth(app: AppHandle) -> Result<DeviceCodeResponse, String> {
+    ensure_github_allowed(&app)?;
+    github::begin_device_auth().await.map_err(|e| e.to_string())
 }
 
 /// Poll for GitHub OAuth Device Flow token
 #[tauri::command]
-pub async fn github_poll_device_token(device_code: String) -> Result<Option<String>, String> {
+pub async fn github_poll_device_token(
+    app: AppHandle,
+    device_code: String,
+) -> Result<Option<String>, String> {
+    ensure_github_allowed(&app)?;
     github::poll_device_token(&device_code)
         .await
         .map_err(|e| e.to_string())

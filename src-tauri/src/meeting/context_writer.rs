@@ -39,7 +39,10 @@ fn read_state(path: &Path) -> MeetingState {
             return state;
         }
     }
-    MeetingState { last_update_id: 0, last_summary_time: None }
+    MeetingState {
+        last_update_id: 0,
+        last_summary_time: None,
+    }
 }
 
 fn write_state(path: &Path, state: &MeetingState) -> Result<()> {

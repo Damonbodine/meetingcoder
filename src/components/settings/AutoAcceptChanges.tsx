@@ -2,9 +2,16 @@ import React from "react";
 import { useSettings } from "../../hooks/useSettings";
 import { ToggleSwitch } from "../ui/ToggleSwitch";
 
-export const AutoAcceptChanges: React.FC<{ descriptionMode?: "tooltip" | "inline"; grouped?: boolean }> = ({
+interface Props {
+  descriptionMode?: "tooltip" | "inline";
+  grouped?: boolean;
+  disabled?: boolean;
+}
+
+export const AutoAcceptChanges: React.FC<Props> = ({
   descriptionMode = "tooltip",
   grouped = false,
+  disabled = false,
 }) => {
   const { getSetting, updateSetting, isUpdating } = useSettings();
   const value = getSetting("auto_accept_changes") ?? false;
@@ -18,7 +25,7 @@ export const AutoAcceptChanges: React.FC<{ descriptionMode?: "tooltip" | "inline
       description="After sending /meeting, automatically send 'y' + Return to accept changes. Requires macOS Accessibility permission."
       descriptionMode={descriptionMode}
       grouped={grouped}
+      disabled={disabled}
     />
   );
 };
-

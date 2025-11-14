@@ -149,6 +149,10 @@ pub struct AppSettings {
     pub overlay_position: OverlayPosition,
     #[serde(default = "default_debug_mode")]
     pub debug_mode: bool,
+    #[serde(default = "default_advanced_features_enabled")]
+    pub advanced_features_enabled: bool,
+    #[serde(default = "default_offline_mode_enabled")]
+    pub offline_mode_enabled: bool,
     #[serde(default)]
     pub custom_words: Vec<String>,
     #[serde(default)]
@@ -255,6 +259,14 @@ fn default_debug_mode() -> bool {
     false
 }
 
+fn default_advanced_features_enabled() -> bool {
+    false
+}
+
+fn default_offline_mode_enabled() -> bool {
+    false
+}
+
 fn default_word_correction_threshold() -> f64 {
     0.18
 }
@@ -275,42 +287,88 @@ fn default_transcription_chunk_seconds() -> u32 {
     10
 }
 
-fn default_system_audio_silence_threshold() -> f32 { -50.0 }
+fn default_system_audio_silence_threshold() -> f32 {
+    -50.0
+}
 
 // Lower default buffer size to reduce RAM footprint and backlog risk.
 // 90s @ 16kHz mono float32 ≈ 5.8 MB
-fn default_system_audio_buffer_seconds() -> u32 { 90 }
+fn default_system_audio_buffer_seconds() -> u32 {
+    90
+}
 
 fn default_meeting_update_interval_seconds() -> u32 {
     20
 }
 
-fn default_auto_trigger_meeting_command() -> bool { false }
+fn default_auto_trigger_meeting_command() -> bool {
+    false
+}
 
-fn default_auto_accept_changes() -> bool { false }
+fn default_auto_accept_changes() -> bool {
+    false
+}
 
-fn default_auto_trigger_min_interval_seconds() -> u32 { 75 }
+fn default_auto_trigger_min_interval_seconds() -> u32 {
+    75
+}
 
-fn default_github_default_branch() -> String { "main".to_string() }
+fn default_github_default_branch() -> String {
+    "main".to_string()
+}
 
-fn default_github_branch_pattern() -> String { "meeting/{meeting_id}".to_string() }
+fn default_github_branch_pattern() -> String {
+    "meeting/{meeting_id}".to_string()
+}
 
-fn default_github_enabled() -> bool { false }
-fn default_github_auto_commit_push() -> bool { true }
-fn default_github_auto_create_pr() -> bool { true }
-fn default_github_auto_update_pr() -> bool { true }
-fn default_prefer_whisper_for_imports() -> bool { false }
-fn default_fast_import_mode_for_imports() -> bool { true }
-fn default_use_fixed_windows_for_imports() -> bool { false }
-fn default_min_segment_duration_for_imports() -> u32 { 10 }
-fn default_ffmpeg_fallback_for_imports() -> bool { true }
-fn default_use_llm_summarization() -> bool { false }
-fn default_llm_model() -> String { "claude-sonnet-4-5-20250929".to_string() }
-fn default_use_queue_transcription() -> bool { true }
-fn default_queue_worker_count() -> u32 { 2 }
-fn default_enable_prd_generation() -> bool { true }
-fn default_prd_initial_min_segments() -> usize { 15 }
-fn default_prd_update_interval_minutes() -> u64 { 15 }
+fn default_github_enabled() -> bool {
+    false
+}
+fn default_github_auto_commit_push() -> bool {
+    true
+}
+fn default_github_auto_create_pr() -> bool {
+    true
+}
+fn default_github_auto_update_pr() -> bool {
+    true
+}
+fn default_prefer_whisper_for_imports() -> bool {
+    false
+}
+fn default_fast_import_mode_for_imports() -> bool {
+    true
+}
+fn default_use_fixed_windows_for_imports() -> bool {
+    false
+}
+fn default_min_segment_duration_for_imports() -> u32 {
+    10
+}
+fn default_ffmpeg_fallback_for_imports() -> bool {
+    true
+}
+fn default_use_llm_summarization() -> bool {
+    false
+}
+fn default_llm_model() -> String {
+    "claude-sonnet-4-5-20250929".to_string()
+}
+fn default_use_queue_transcription() -> bool {
+    true
+}
+fn default_queue_worker_count() -> u32 {
+    2
+}
+fn default_enable_prd_generation() -> bool {
+    true
+}
+fn default_prd_initial_min_segments() -> usize {
+    15
+}
+fn default_prd_update_interval_minutes() -> u64 {
+    15
+}
 
 pub const SETTINGS_STORE_PATH: &str = "settings_store.json";
 
@@ -352,6 +410,8 @@ pub fn get_default_settings() -> AppSettings {
         selected_language: "auto".to_string(),
         overlay_position: OverlayPosition::Bottom,
         debug_mode: false,
+        advanced_features_enabled: false,
+        offline_mode_enabled: false,
         custom_words: Vec::new(),
         model_unload_timeout: ModelUnloadTimeout::Never,
         word_correction_threshold: default_word_correction_threshold(),

@@ -4,17 +4,21 @@
 //! by managing the audio stream in a dedicated thread and communicating
 //! via channels.
 
-use super::{ring_buffer::SpscRingBuffer, SystemAudioCapture, SystemAudioCaptureDevice, VirtualDeviceInfo};
+use super::{
+    ring_buffer::SpscRingBuffer, SystemAudioCapture, SystemAudioCaptureDevice, VirtualDeviceInfo,
+};
 use anyhow::Result;
-use rubato::{Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction};
+use rubato::{
+    Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction,
+};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
-use std::sync::atomic::{AtomicU32, Ordering};
 
 const TARGET_SAMPLE_RATE: usize = 16000; // Whisper sample rate
-// Hard cap the buffered audio to prevent unbounded memory growth.
-// 180 seconds @ 16kHz mono float32 ~= 11.5 MB.
+                                         // Hard cap the buffered audio to prevent unbounded memory growth.
+                                         // 180 seconds @ 16kHz mono float32 ~= 11.5 MB.
 const MAX_BUFFER_SECONDS: usize = 180;
 const MAX_BUFFER_SAMPLES: usize = TARGET_SAMPLE_RATE * MAX_BUFFER_SECONDS;
 
@@ -93,7 +97,8 @@ impl SendableSystemAudio {
                             "Device sample rate (pre-start): {} Hz, target: {} Hz",
                             device_sample_rate, TARGET_SAMPLE_RATE
                         );
-                        device_sample_rate_clone.store(device_sample_rate as u32, Ordering::Release);
+                        device_sample_rate_clone
+                            .store(device_sample_rate as u32, Ordering::Release);
 
                         // Create resampler if needed (wrapped in Arc<Mutex> for callback)
                         let needs_resampling = device_sample_rate != TARGET_SAMPLE_RATE;
@@ -115,16 +120,21 @@ impl SendableSystemAudio {
                                 1, // mono
                             ) {
                                 Ok(r) => {
-                                    let ratio = TARGET_SAMPLE_RATE as f64 / device_sample_rate as f64;
+                                    let ratio =
+                                        TARGET_SAMPLE_RATE as f64 / device_sample_rate as f64;
                                     println!(
                                         "Resampler created: {} Hz -> {} Hz (ratio {:.6})",
                                         device_sample_rate, TARGET_SAMPLE_RATE, ratio
                                     );
-                                    resample_ratio_milli_clone.store((ratio * 1000.0) as u32, Ordering::Release);
+                                    resample_ratio_milli_clone
+                                        .store((ratio * 1000.0) as u32, Ordering::Release);
                                     Arc::new(Mutex::new(Some(r)))
                                 }
                                 Err(e) => {
-                                    eprintln!("Failed to create resampler: {}, audio may be corrupted", e);
+                                    eprintln!(
+                                        "Failed to create resampler: {}, audio may be corrupted",
+                                        e
+                                    );
                                     Arc::new(Mutex::new(None))
                                 }
                             }
@@ -145,10 +155,13 @@ impl SendableSystemAudio {
                                 loop {
                                     let needed = r.input_frames_next();
                                     let have = in_accumulator.len();
-                                    if have < needed { break; }
+                                    if have < needed {
+                                        break;
+                                    }
 
                                     // Take exactly 'needed' frames for processing
-                                    let input_chunk: Vec<f32> = in_accumulator.drain(..needed).collect();
+                                    let input_chunk: Vec<f32> =
+                                        in_accumulator.drain(..needed).collect();
 
                                     match r.process(&[input_chunk], None) {
                                         Ok(output) => {

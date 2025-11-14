@@ -1,14 +1,14 @@
 // Re-export all audio components
 mod device;
+mod loader;
 mod recorder;
 mod resampler;
 mod utils;
-mod loader;
 mod visualizer;
 
 pub use device::{list_input_devices, list_output_devices, CpalDeviceInfo};
+pub use loader::load_audio_file_to_mono_16k;
 pub use recorder::AudioRecorder;
 pub use resampler::FrameResampler;
 pub use utils::save_wav_file;
 pub use visualizer::AudioVisualiser;
-pub use loader::load_audio_file_to_mono_16k;

@@ -231,10 +231,7 @@ async fn detect_languages(project_path: &Path) -> Result<Vec<String>> {
 }
 
 /// Finds entry point files for the project
-async fn find_entry_points(
-    project_path: &Path,
-    framework: Option<&str>,
-) -> Result<Vec<PathBuf>> {
+async fn find_entry_points(project_path: &Path, framework: Option<&str>) -> Result<Vec<PathBuf>> {
     let mut entry_points = Vec::new();
 
     match framework {
@@ -444,12 +441,11 @@ async fn extract_dependencies(
                     for (name, value) in deps {
                         let version = match value {
                             toml::Value::String(v) => v.clone(),
-                            toml::Value::Table(t) => {
-                                t.get("version")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("*")
-                                    .to_string()
-                            }
+                            toml::Value::Table(t) => t
+                                .get("version")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("*")
+                                .to_string(),
                             _ => "*".to_string(),
                         };
                         dependencies.insert(name.clone(), version);

@@ -7,7 +7,7 @@
 use super::{AudioChunkCallback, SystemAudioCaptureDevice, VirtualDeviceInfo};
 use anyhow::{Context, Result};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, Host, Stream, SampleFormat};
+use cpal::{Device, Host, SampleFormat, Stream};
 use log::{debug, info, warn};
 use std::sync::{Arc, Mutex};
 

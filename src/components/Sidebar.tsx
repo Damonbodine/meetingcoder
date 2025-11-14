@@ -48,7 +48,7 @@ export const SECTIONS_CONFIG = {
     label: "Integrations",
     icon: Plug,
     component: IntegrationsSettings,
-    enabled: () => true,
+    enabled: (settings) => settings?.advanced_features_enabled ?? false,
   },
   advanced: {
     label: "Advanced",

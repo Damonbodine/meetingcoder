@@ -83,11 +83,11 @@ impl Default for PRDContent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserStory {
     pub id: String,
-    pub persona: String,  // "As a [persona]"
-    pub want: String,     // "I want to [action]"
-    pub so_that: String,  // "So that [benefit]"
-    pub priority: String, // "high", "medium", "low"
-    pub status: String,   // "planned", "in_progress", "completed"
+    pub persona: String,          // "As a [persona]"
+    pub want: String,             // "I want to [action]"
+    pub so_that: String,          // "So that [benefit]"
+    pub priority: String,         // "high", "medium", "low"
+    pub status: String,           // "planned", "in_progress", "completed"
     pub mentioned_at: Vec<usize>, // Transcript segment IDs
 }
 
@@ -97,8 +97,8 @@ pub struct Requirement {
     pub id: String,
     pub title: String,
     pub description: String,
-    pub priority: String, // "high", "medium", "low"
-    pub status: String,   // "planned", "discussed", "in_progress", "completed"
+    pub priority: String,         // "high", "medium", "low"
+    pub status: String,           // "planned", "discussed", "in_progress", "completed"
     pub category: Option<String>, // For NFRs: "performance", "security", "scalability", "usability"
     pub mentioned_at: Vec<usize>,
 }

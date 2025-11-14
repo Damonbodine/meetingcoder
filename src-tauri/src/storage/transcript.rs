@@ -48,7 +48,10 @@ impl TranscriptStorage {
             {
                 fs::create_dir_all(&base_path)?;
             }
-            log::info!("Created transcript storage directory: {}", base_path.display());
+            log::info!(
+                "Created transcript storage directory: {}",
+                base_path.display()
+            );
         }
 
         Ok(Self { base_path })
@@ -74,7 +77,8 @@ impl TranscriptStorage {
         let date_str = datetime.format("%Y-%m-%d").to_string();
 
         // Security: Comprehensive sanitization to prevent path traversal
-        let sanitized_name: String = meeting.name
+        let sanitized_name: String = meeting
+            .name
             .chars()
             .filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-' || *c == '_')
             .collect::<String>()
@@ -96,7 +100,8 @@ impl TranscriptStorage {
 
     /// Get the directory path for a specific meeting
     fn get_meeting_dir(&self, meeting: &MeetingSession) -> PathBuf {
-        self.base_path.join(Self::generate_meeting_dir_name(meeting))
+        self.base_path
+            .join(Self::generate_meeting_dir_name(meeting))
     }
 
     /// Save a complete meeting transcript
@@ -146,7 +151,8 @@ impl TranscriptStorage {
 
     /// Create metadata from a meeting session
     fn create_metadata(&self, meeting: &MeetingSession) -> Result<TranscriptMetadata> {
-        let end_time = meeting.end_time
+        let end_time = meeting
+            .end_time
             .ok_or_else(|| anyhow::anyhow!("Meeting has no end time"))?;
 
         let duration = end_time
@@ -170,9 +176,11 @@ impl TranscriptStorage {
     fn generate_markdown(&self, meeting: &MeetingSession) -> Result<String> {
         let start_datetime: DateTime<Local> = meeting.start_time.into();
         let duration = if let Some(end_time) = meeting.end_time {
-            end_time.duration_since(meeting.start_time)
+            end_time
+                .duration_since(meeting.start_time)
                 .unwrap_or(std::time::Duration::from_secs(0))
-                .as_secs() / 60
+                .as_secs()
+                / 60
         } else {
             0
         };
@@ -181,9 +189,15 @@ impl TranscriptStorage {
 
         // Header
         markdown.push_str(&format!("# {}\n\n", meeting.name));
-        markdown.push_str(&format!("**Date**: {}\n", start_datetime.format("%B %d, %Y")));
+        markdown.push_str(&format!(
+            "**Date**: {}\n",
+            start_datetime.format("%B %d, %Y")
+        ));
         markdown.push_str(&format!("**Duration**: {} minutes\n", duration));
-        markdown.push_str(&format!("**Participants**: {}\n\n", meeting.participants.join(", ")));
+        markdown.push_str(&format!(
+            "**Participants**: {}\n\n",
+            meeting.participants.join(", ")
+        ));
         markdown.push_str("---\n\n");
 
         // Transcript segments
@@ -207,11 +221,17 @@ impl TranscriptStorage {
     }
 
     /// Load a transcript from disk
-    pub fn load_transcript(&self, meeting_dir_name: &str) -> Result<(TranscriptMetadata, TranscriptData)> {
+    pub fn load_transcript(
+        &self,
+        meeting_dir_name: &str,
+    ) -> Result<(TranscriptMetadata, TranscriptData)> {
         let meeting_dir = self.base_path.join(meeting_dir_name);
 
         if !meeting_dir.exists() {
-            return Err(anyhow::anyhow!("Meeting directory not found: {}", meeting_dir.display()));
+            return Err(anyhow::anyhow!(
+                "Meeting directory not found: {}",
+                meeting_dir.display()
+            ));
         }
 
         // Load metadata

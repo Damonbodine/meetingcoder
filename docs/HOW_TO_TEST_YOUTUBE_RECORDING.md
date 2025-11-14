@@ -16,6 +16,17 @@
 
 **Why?** Without this, when you route audio to BlackHole, you won't hear anything!
 
+#### Optional: Keep Volume Control with Background Music (Free)
+
+- Install the open-source Background Music utility so you can keep BlackHole selected while
+  still adjusting Zoom/system audio volume:
+  1. `brew install --cask background-music`
+  2. Launch **Background Music** (menu bar) and raise/lower the Zoom slider as needed
+  3. Leave BlackHole selected as the capture device in MeetingCoder — Background Music mirrors the
+     audio to your headphones with its own gain control
+
+This avoids the "Multi-Output volume locked at 100%" issue without buying commercial software.
+
 ---
 
 ### 2. Run the App

@@ -1,6 +1,9 @@
 //! Tauri commands for system audio capture functionality
 
-use crate::system_audio::{get_setup_instructions, is_system_audio_available, SystemAudioCapture, SystemAudioCaptureDevice, VirtualDeviceInfo};
+use crate::system_audio::{
+    get_setup_instructions, is_system_audio_available, SystemAudioCapture,
+    SystemAudioCaptureDevice, VirtualDeviceInfo,
+};
 use serde::{Deserialize, Serialize};
 
 /// Response for device detection

@@ -42,4 +42,3 @@ pub fn append_segment(
     file.flush()?;
     Ok(())
 }
-

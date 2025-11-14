@@ -3,9 +3,16 @@ import { useSettings } from "../../hooks/useSettings";
 import { Input } from "../ui/Input";
 import { SettingContainer } from "../ui/SettingContainer";
 
-export const AutomationDebounce: React.FC<{ descriptionMode?: "tooltip" | "inline"; grouped?: boolean }> = ({
+interface Props {
+  descriptionMode?: "tooltip" | "inline";
+  grouped?: boolean;
+  disabled?: boolean;
+}
+
+export const AutomationDebounce: React.FC<Props> = ({
   descriptionMode = "inline",
   grouped = false,
+  disabled = false,
 }) => {
   const { getSetting, updateSetting, isUpdating } = useSettings();
   const current = getSetting("auto_trigger_min_interval_seconds") ?? 75;
@@ -23,7 +30,9 @@ export const AutomationDebounce: React.FC<{ descriptionMode?: "tooltip" | "inlin
     }
     const clamped = Math.min(600, Math.max(30, parsed));
     setValue(String(clamped));
-    await updateSetting("auto_trigger_min_interval_seconds", clamped);
+    if (!disabled) {
+      await updateSetting("auto_trigger_min_interval_seconds", clamped);
+    }
   };
 
   return (
@@ -33,6 +42,7 @@ export const AutomationDebounce: React.FC<{ descriptionMode?: "tooltip" | "inlin
       descriptionMode={descriptionMode}
       grouped={grouped}
       layout="horizontal"
+      disabled={disabled}
     >
       <div className="flex items-center space-x-2">
         <Input
@@ -46,7 +56,7 @@ export const AutomationDebounce: React.FC<{ descriptionMode?: "tooltip" | "inlin
           onKeyDown={(e) => {
             if (e.key === "Enter") commit();
           }}
-          disabled={isUpdating("auto_trigger_min_interval_seconds")}
+          disabled={disabled || isUpdating("auto_trigger_min_interval_seconds")}
           className="w-20"
         />
         <span className="text-sm text-text">seconds</span>
@@ -54,4 +64,3 @@ export const AutomationDebounce: React.FC<{ descriptionMode?: "tooltip" | "inlin
     </SettingContainer>
   );
 };
-

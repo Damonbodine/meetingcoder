@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
+import { useSettings } from "../hooks/useSettings";
 
 type AudioSource = string; // "microphone" or "system:<device>"
 
@@ -19,6 +20,9 @@ export const StatusBar: React.FC = () => {
   const [modelLoaded, setModelLoaded] = useState<boolean>(false);
   const lastOverwrittenRef = useRef<number>(0);
   const warnedRef = useRef<boolean>(false);
+  const { settings } = useSettings();
+  const advancedEnabled = settings?.advanced_features_enabled ?? false;
+  const offlineMode = settings?.offline_mode_enabled ?? false;
 
   useEffect(() => {
     let cancelled = false;
@@ -69,6 +73,8 @@ export const StatusBar: React.FC = () => {
   const fill = metrics ? `${metrics.buffer_fill_percent.toFixed(0)}%` : "-";
   const warn = metrics ? (metrics.buffer_fill_percent > 70) : false;
   const stateItems = [
+    `Mode: ${advancedEnabled ? "Advanced" : "Recorder"}`,
+    offlineMode ? "Offline" : "Online",
     `Source: ${deviceLabel || "-"}`,
     `Buffer: ${fill}`,
     `Model: ${modelLoaded ? "Loaded" : "Not loaded"}`,

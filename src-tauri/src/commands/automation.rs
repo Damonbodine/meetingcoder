@@ -1,6 +1,6 @@
+use crate::managers::meeting::MeetingManager;
 use std::sync::Arc;
 use tauri::{AppHandle, State};
-use crate::managers::meeting::MeetingManager;
 
 #[tauri::command]
 pub async fn trigger_meeting_command_now(
@@ -12,8 +12,12 @@ pub async fn trigger_meeting_command_now(
         .get_meeting(&meeting_id)
         .await
         .map_err(|e| format!("{}", e))?;
-    let Some(path) = meeting.project_path.clone() else { return Ok(false); };
-    if path.is_empty() { return Ok(false); }
+    let Some(path) = meeting.project_path.clone() else {
+        return Ok(false);
+    };
+    if path.is_empty() {
+        return Ok(false);
+    }
     crate::automation::claude_trigger::trigger_meeting_update(&app, &path, &meeting_id, 0)
         .map_err(|e| e.to_string())
 }
@@ -28,9 +32,14 @@ pub async fn open_meeting_terminal(
         .get_meeting(&meeting_id)
         .await
         .map_err(|e| format!("{}", e))?;
-    let Some(path) = meeting.project_path.clone() else { return Ok(()); };
-    if path.is_empty() { return Ok(()); }
-    crate::automation::claude_trigger::open_project_in_terminal(&app, &path).map_err(|e| e.to_string())
+    let Some(path) = meeting.project_path.clone() else {
+        return Ok(());
+    };
+    if path.is_empty() {
+        return Ok(());
+    }
+    crate::automation::claude_trigger::open_project_in_terminal(&app, &path)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -42,8 +51,12 @@ pub async fn open_meeting_vscode(
         .get_meeting(&meeting_id)
         .await
         .map_err(|e| format!("{}", e))?;
-    let Some(path) = meeting.project_path.clone() else { return Ok(()); };
-    if path.is_empty() { return Ok(()); }
+    let Some(path) = meeting.project_path.clone() else {
+        return Ok(());
+    };
+    if path.is_empty() {
+        return Ok(());
+    }
     crate::automation::claude_trigger::open_project_in_vscode(&path).map_err(|e| e.to_string())
 }
 
@@ -56,8 +69,12 @@ pub async fn open_meeting_cursor(
         .get_meeting(&meeting_id)
         .await
         .map_err(|e| format!("{}", e))?;
-    let Some(path) = meeting.project_path.clone() else { return Ok(()); };
-    if path.is_empty() { return Ok(()); }
+    let Some(path) = meeting.project_path.clone() else {
+        return Ok(());
+    };
+    if path.is_empty() {
+        return Ok(());
+    }
     crate::automation::claude_trigger::open_project_in_cursor(&path).map_err(|e| e.to_string())
 }
 
@@ -70,8 +87,12 @@ pub async fn open_meeting_vscode_with_meeting(
         .get_meeting(&meeting_id)
         .await
         .map_err(|e| format!("{}", e))?;
-    let Some(path) = meeting.project_path.clone() else { return Ok(()); };
-    if path.is_empty() { return Ok(()); }
+    let Some(path) = meeting.project_path.clone() else {
+        return Ok(());
+    };
+    if path.is_empty() {
+        return Ok(());
+    }
     // Ensure the correct project window is opened/focused first, then run the meeting command
     // Open project first; then run meeting in the correct workspace
     let _ = crate::automation::claude_trigger::open_project_in_vscode(&path);
@@ -87,8 +108,12 @@ pub async fn open_meeting_cursor_with_meeting(
         .get_meeting(&meeting_id)
         .await
         .map_err(|e| format!("{}", e))?;
-    let Some(path) = meeting.project_path.clone() else { return Ok(()); };
-    if path.is_empty() { return Ok(()); }
+    let Some(path) = meeting.project_path.clone() else {
+        return Ok(());
+    };
+    if path.is_empty() {
+        return Ok(());
+    }
     // Ensure the correct project window is opened/focused first, then run the meeting command
     // Open project first; then run meeting in the correct workspace
     let _ = crate::automation::claude_trigger::open_project_in_cursor(&path);

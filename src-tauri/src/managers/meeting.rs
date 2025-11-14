@@ -1,10 +1,10 @@
-use crate::managers::audio::{AudioRecordingManager, AudioSource};
-use crate::shortcut; // for dynamic settings adjustments
-use crate::managers::transcription::TranscriptionManager;
-use crate::storage::transcript::TranscriptStorage;
-use crate::integrations::github;
-use crate::settings;
 use crate::document_generation::PRDGenerator;
+use crate::integrations::github;
+use crate::managers::audio::{AudioRecordingManager, AudioSource};
+use crate::managers::transcription::TranscriptionManager;
+use crate::settings;
+use crate::shortcut; // for dynamic settings adjustments
+use crate::storage::transcript::TranscriptStorage;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -45,7 +45,9 @@ fn live_next_speaker_label(state: &mut LiveDiarState, turn_boundary: bool) -> St
 }
 
 fn live_silence_fraction(samples: &[f32], thresh: f32) -> f32 {
-    if samples.is_empty() { return 1.0; }
+    if samples.is_empty() {
+        return 1.0;
+    }
     let silent = samples.iter().filter(|&&s| s.abs() < thresh).count();
     silent as f32 / samples.len() as f32
 }
@@ -150,7 +152,8 @@ impl MeetingManager {
         let meeting_id = Uuid::new_v4().to_string();
         // Initialize meeting in selected GitHub repo when enabled, else fallback to MeetingCoder workspace
         let settings = settings::get_settings(&self.app_handle);
-        let project_path = if settings.github_enabled
+        let project_path = if settings.advanced_features_enabled
+            && settings.github_enabled
             && settings.github_repo_owner.is_some()
             && settings.github_repo_name.is_some()
         {
@@ -165,12 +168,18 @@ impl MeetingManager {
                     Some(repo_root)
                 }
                 Err(e) => {
-                    log::warn!("Falling back to MeetingCoder workspace (GitHub clone failed): {}", e);
+                    log::warn!(
+                        "Falling back to MeetingCoder workspace (GitHub clone failed): {}",
+                        e
+                    );
                     match crate::project::initializer::ProjectInitializer::with_default_path()
                         .and_then(|init| init.init_for_meeting_with_app(&name, &self.app_handle))
                     {
                         Ok(path) => Some(path),
-                        Err(e) => { log::warn!("Project initialization failed: {}", e); None }
+                        Err(e) => {
+                            log::warn!("Project initialization failed: {}", e);
+                            None
+                        }
                     }
                 }
             }
@@ -180,7 +189,10 @@ impl MeetingManager {
                 .and_then(|init| init.init_for_meeting_with_app(&name, &self.app_handle))
             {
                 Ok(path) => Some(path),
-                Err(e) => { log::warn!("Project initialization failed: {}", e); None }
+                Err(e) => {
+                    log::warn!("Project initialization failed: {}", e);
+                    None
+                }
             }
         };
         let meeting = MeetingSession {
@@ -216,12 +228,14 @@ impl MeetingManager {
                 if let Err(e) = self.audio_manager.start_system_audio(device_name.clone()) {
                     log::warn!(
                         "Failed to auto-start system audio for device '{}': {}",
-                        device_name, e
+                        device_name,
+                        e
                     );
                 } else {
                     log::info!(
                         "Auto-started system audio capture for meeting '{}' on device '{}'",
-                        meeting_id, device_name
+                        meeting_id,
+                        device_name
                     );
                 }
             }
@@ -275,46 +289,50 @@ impl MeetingManager {
         // Analyze codebase and set up file isolation if project path exists (Developer Mode)
         if let Some(ref path) = {
             let meetings = self.active_meetings.lock().await;
-            meetings.get(&meeting_id).and_then(|m| m.project_path.clone())
+            meetings
+                .get(&meeting_id)
+                .and_then(|m| m.project_path.clone())
         } {
             let project_path_clone = path.clone();
             let meeting_id_clone = meeting_id.clone();
             let meeting_name_clone = name.clone();
             let app_handle_clone = self.app_handle.clone();
-            log::info!("Starting codebase analysis and file isolation for project: {}", path);
+            log::info!(
+                "Starting codebase analysis and file isolation for project: {}",
+                path
+            );
 
             tokio::spawn(async move {
                 let project_path = std::path::PathBuf::from(&project_path_clone);
 
                 // Analyze codebase
-                let framework = match crate::codebase::analyze_and_save_codebase(&project_path).await {
-                    Ok(manifest) => {
-                        log::info!(
-                            "Codebase analysis complete: {} files, framework: {:?}",
-                            manifest.total_files,
+                let framework =
+                    match crate::codebase::analyze_and_save_codebase(&project_path).await {
+                        Ok(manifest) => {
+                            log::info!(
+                                "Codebase analysis complete: {} files, framework: {:?}",
+                                manifest.total_files,
+                                manifest.framework
+                            );
                             manifest.framework
-                        );
-                        manifest.framework
-                    }
-                    Err(e) => {
-                        log::warn!("Codebase analysis failed (non-critical): {}", e);
-                        None
-                    }
-                };
+                        }
+                        Err(e) => {
+                            log::warn!("Codebase analysis failed (non-critical): {}", e);
+                            None
+                        }
+                    };
 
                 // Generate .claudeignore for file protection
-                if let Err(e) = crate::codebase::generate_claudeignore(
-                    &project_path,
-                    framework.as_deref()
-                ) {
+                if let Err(e) =
+                    crate::codebase::generate_claudeignore(&project_path, framework.as_deref())
+                {
                     log::warn!("Failed to generate .claudeignore: {}", e);
                 }
 
                 // Create experiments directory for this meeting
-                if let Err(e) = crate::codebase::create_experiments_dir(
-                    &project_path,
-                    &meeting_id_clone
-                ) {
+                if let Err(e) =
+                    crate::codebase::create_experiments_dir(&project_path, &meeting_id_clone)
+                {
                     log::warn!("Failed to create experiments directory: {}", e);
                 }
 
@@ -324,7 +342,9 @@ impl MeetingManager {
                     &project_path_clone,
                     &meeting_id_clone,
                     &meeting_name_clone,
-                ).await {
+                )
+                .await
+                {
                     log::info!("GitHub auto-branch creation skipped or failed: {}", e);
                 }
             });
@@ -339,27 +359,34 @@ impl MeetingManager {
         let meeting_id = uuid::Uuid::new_v4().to_string();
         // Initialize meeting in selected GitHub repo when enabled, else fallback to MeetingCoder workspace
         let settings = settings::get_settings(&self.app_handle);
-        let project_path = if settings.github_enabled
+        let project_path = if settings.advanced_features_enabled
+            && settings.github_enabled
             && settings.github_repo_owner.is_some()
             && settings.github_repo_name.is_some()
         {
             let owner = settings.github_repo_owner.clone().unwrap();
             let repo = settings.github_repo_name.clone().unwrap();
-            match crate::integrations::github::get_github_token()
-                .and_then(|token| crate::integrations::github::ensure_local_repo_clone(&owner, &repo, &token))
-            {
+            match crate::integrations::github::get_github_token().and_then(|token| {
+                crate::integrations::github::ensure_local_repo_clone(&owner, &repo, &token)
+            }) {
                 Ok(repo_root) => {
                     // Seed meeting scaffolding inside the repo root
                     let _ = crate::project::initializer::ProjectInitializer::seed_in_existing_dir_with_app(&std::path::PathBuf::from(&repo_root), &self.app_handle);
                     Some(repo_root)
                 }
                 Err(e) => {
-                    log::warn!("Falling back to MeetingCoder workspace (GitHub clone failed): {}", e);
+                    log::warn!(
+                        "Falling back to MeetingCoder workspace (GitHub clone failed): {}",
+                        e
+                    );
                     match crate::project::initializer::ProjectInitializer::with_default_path()
                         .and_then(|init| init.init_for_meeting_with_app(&name, &self.app_handle))
                     {
                         Ok(path) => Some(path),
-                        Err(e) => { log::warn!("Project initialization failed: {}", e); None }
+                        Err(e) => {
+                            log::warn!("Project initialization failed: {}", e);
+                            None
+                        }
                     }
                 }
             }
@@ -369,7 +396,10 @@ impl MeetingManager {
                 .and_then(|init| init.init_for_meeting_with_app(&name, &self.app_handle))
             {
                 Ok(path) => Some(path),
-                Err(e) => { log::warn!("Project initialization failed: {}", e); None }
+                Err(e) => {
+                    log::warn!("Project initialization failed: {}", e);
+                    None
+                }
             }
         };
 
@@ -396,46 +426,50 @@ impl MeetingManager {
         // Analyze codebase and set up file isolation if project path exists (Developer Mode)
         if let Some(ref path) = {
             let meetings = self.active_meetings.lock().await;
-            meetings.get(&meeting_id).and_then(|m| m.project_path.clone())
+            meetings
+                .get(&meeting_id)
+                .and_then(|m| m.project_path.clone())
         } {
             let project_path_clone = path.clone();
             let meeting_id_clone = meeting_id.clone();
             let meeting_name_clone = name.clone();
             let app_handle_clone = self.app_handle.clone();
-            log::info!("Starting codebase analysis and file isolation for offline meeting: {}", path);
+            log::info!(
+                "Starting codebase analysis and file isolation for offline meeting: {}",
+                path
+            );
 
             tokio::spawn(async move {
                 let project_path = std::path::PathBuf::from(&project_path_clone);
 
                 // Analyze codebase
-                let framework = match crate::codebase::analyze_and_save_codebase(&project_path).await {
-                    Ok(manifest) => {
-                        log::info!(
-                            "Codebase analysis complete: {} files, framework: {:?}",
-                            manifest.total_files,
+                let framework =
+                    match crate::codebase::analyze_and_save_codebase(&project_path).await {
+                        Ok(manifest) => {
+                            log::info!(
+                                "Codebase analysis complete: {} files, framework: {:?}",
+                                manifest.total_files,
+                                manifest.framework
+                            );
                             manifest.framework
-                        );
-                        manifest.framework
-                    }
-                    Err(e) => {
-                        log::warn!("Codebase analysis failed (non-critical): {}", e);
-                        None
-                    }
-                };
+                        }
+                        Err(e) => {
+                            log::warn!("Codebase analysis failed (non-critical): {}", e);
+                            None
+                        }
+                    };
 
                 // Generate .claudeignore for file protection
-                if let Err(e) = crate::codebase::generate_claudeignore(
-                    &project_path,
-                    framework.as_deref()
-                ) {
+                if let Err(e) =
+                    crate::codebase::generate_claudeignore(&project_path, framework.as_deref())
+                {
                     log::warn!("Failed to generate .claudeignore: {}", e);
                 }
 
                 // Create experiments directory for this meeting
-                if let Err(e) = crate::codebase::create_experiments_dir(
-                    &project_path,
-                    &meeting_id_clone
-                ) {
+                if let Err(e) =
+                    crate::codebase::create_experiments_dir(&project_path, &meeting_id_clone)
+                {
                     log::warn!("Failed to create experiments directory: {}", e);
                 }
 
@@ -445,7 +479,9 @@ impl MeetingManager {
                     &project_path_clone,
                     &meeting_id_clone,
                     &meeting_name_clone,
-                ).await {
+                )
+                .await
+                {
                     log::info!("GitHub auto-branch creation skipped or failed: {}", e);
                 }
             });
@@ -500,7 +536,9 @@ impl MeetingManager {
             let meeting_clone = meeting.clone();
             drop(meetings);
 
-            let duration = meeting_clone.end_time.unwrap()
+            let duration = meeting_clone
+                .end_time
+                .unwrap()
                 .duration_since(meeting_clone.start_time)
                 .unwrap_or(Duration::from_secs(0));
 
@@ -526,13 +564,23 @@ impl MeetingManager {
             // First, drain queue for this meeting up to a timeout
             let drain_timeout = Duration::from_secs(60);
             let start_wait = std::time::Instant::now();
-            if let Some(q) = self.app_handle.try_state::<std::sync::Arc<crate::queue::Queue>>() {
+            if let Some(q) = self
+                .app_handle
+                .try_state::<std::sync::Arc<crate::queue::Queue>>()
+            {
                 loop {
-                    let (qcnt, pcnt) = q.counts_for_meeting(meeting_id).unwrap_or((0,0));
-                    if qcnt + pcnt == 0 { break; }
-                    if start_wait.elapsed() > drain_timeout { 
-                        log::warn!("Queue drain timeout for meeting {} (queued={}, processing={})", meeting_id, qcnt, pcnt);
-                        break; 
+                    let (qcnt, pcnt) = q.counts_for_meeting(meeting_id).unwrap_or((0, 0));
+                    if qcnt + pcnt == 0 {
+                        break;
+                    }
+                    if start_wait.elapsed() > drain_timeout {
+                        log::warn!(
+                            "Queue drain timeout for meeting {} (queued={}, processing={})",
+                            meeting_id,
+                            qcnt,
+                            pcnt
+                        );
+                        break;
                     }
                     tokio::time::sleep(Duration::from_millis(250)).await;
                 }
@@ -545,7 +593,11 @@ impl MeetingManager {
             };
             match self.transcript_storage.save_transcript(&meeting_snapshot) {
                 Err(e) => {
-                    log::error!("Failed to save transcript for meeting {}: {}", meeting_snapshot.name, e);
+                    log::error!(
+                        "Failed to save transcript for meeting {}: {}",
+                        meeting_snapshot.name,
+                        e
+                    );
                 }
                 Ok(meeting_dir) => {
                     log::info!("Transcript saved for meeting: {}", meeting_snapshot.name);
@@ -565,25 +617,33 @@ impl MeetingManager {
                         let minutes = duration.as_secs() / 60;
                         let _ = writeln!(md, "**Title**: {}", meeting_snapshot.name);
                         let _ = writeln!(md, "**Duration**: {} minutes\n", minutes);
-                        if !summary.new_features.is_empty() || !summary.new_features_structured.is_empty() {
+                        if !summary.new_features.is_empty()
+                            || !summary.new_features_structured.is_empty()
+                        {
                             let _ = writeln!(md, "## Key Points / Features");
                             if !summary.new_features_structured.is_empty() {
                                 for f in &summary.new_features_structured {
                                     let _ = writeln!(md, "- {}", f.title);
                                 }
                             } else {
-                                for s in &summary.new_features { let _ = writeln!(md, "- {}", s); }
+                                for s in &summary.new_features {
+                                    let _ = writeln!(md, "- {}", s);
+                                }
                             }
                             let _ = writeln!(md);
                         }
                         if !summary.technical_decisions.is_empty() {
                             let _ = writeln!(md, "## Decisions");
-                            for s in &summary.technical_decisions { let _ = writeln!(md, "- {}", s); }
+                            for s in &summary.technical_decisions {
+                                let _ = writeln!(md, "- {}", s);
+                            }
                             let _ = writeln!(md);
                         }
                         if !summary.questions.is_empty() {
                             let _ = writeln!(md, "## Open Questions");
-                            for s in &summary.questions { let _ = writeln!(md, "- {}", s); }
+                            for s in &summary.questions {
+                                let _ = writeln!(md, "- {}", s);
+                            }
                             let _ = writeln!(md);
                         }
                         // Save summary.md alongside transcript
@@ -623,28 +683,55 @@ impl MeetingManager {
                                     full_wav_path
                                 );
                                 if let Err(e) = (|| -> Result<(), anyhow::Error> {
-                                    use hound::{WavSpec, WavWriter, SampleFormat};
-                                    let spec = WavSpec { channels: 1, sample_rate: 16_000, bits_per_sample: 32, sample_format: SampleFormat::Float };
+                                    use hound::{SampleFormat, WavSpec, WavWriter};
+                                    let spec = WavSpec {
+                                        channels: 1,
+                                        sample_rate: 16_000,
+                                        bits_per_sample: 32,
+                                        sample_format: SampleFormat::Float,
+                                    };
                                     let mut writer = WavWriter::create(&full_wav_path, spec)?;
                                     for part in files.iter() {
                                         let mut reader = match hound::WavReader::open(part) {
                                             Ok(r) => r,
-                                            Err(e) => { log::warn!("Skipping corrupt segment {:?}: {}", part, e); continue; }
+                                            Err(e) => {
+                                                log::warn!(
+                                                    "Skipping corrupt segment {:?}: {}",
+                                                    part,
+                                                    e
+                                                );
+                                                continue;
+                                            }
                                         };
                                         let rspec = reader.spec();
                                         if rspec.channels != 1 || rspec.sample_rate != 16_000 {
                                             log::warn!("Unexpected segment format {:?} (channels={}, rate={}), converting via loader", part, rspec.channels, rspec.sample_rate);
                                             let samples = crate::audio_toolkit::audio::load_audio_file_to_mono_16k(part)?;
-                                            for s in samples { writer.write_sample(s)?; }
+                                            for s in samples {
+                                                writer.write_sample(s)?;
+                                            }
                                         } else {
                                             // Try reading as f32 first
-                                            if rspec.sample_format == hound::SampleFormat::Float && rspec.bits_per_sample == 32 {
-                                                for s in reader.samples::<f32>() { writer.write_sample(s?)?; }
-                                            } else if rspec.sample_format == hound::SampleFormat::Int && rspec.bits_per_sample == 16 {
-                                                for s in reader.samples::<i16>() { writer.write_sample((s? as f32) / (i16::MAX as f32))?; }
+                                            if rspec.sample_format == hound::SampleFormat::Float
+                                                && rspec.bits_per_sample == 32
+                                            {
+                                                for s in reader.samples::<f32>() {
+                                                    writer.write_sample(s?)?;
+                                                }
+                                            } else if rspec.sample_format
+                                                == hound::SampleFormat::Int
+                                                && rspec.bits_per_sample == 16
+                                            {
+                                                for s in reader.samples::<i16>() {
+                                                    writer.write_sample(
+                                                        (s? as f32) / (i16::MAX as f32),
+                                                    )?;
+                                                }
                                             } else {
                                                 let samples = crate::audio_toolkit::audio::load_audio_file_to_mono_16k(part)?;
-                                                for s in samples { writer.write_sample(s)?; }
+                                                for s in samples {
+                                                    writer.write_sample(s)?;
+                                                }
                                             }
                                         }
                                     }
@@ -656,11 +743,18 @@ impl MeetingManager {
                                     log::info!("Wrote final WAV to {:?}", full_wav_path);
                                 }
                             } else {
-                                log::info!("No segment WAVs found in {:?}; skipping final WAV composition", seg_dir);
+                                log::info!(
+                                    "No segment WAVs found in {:?}; skipping final WAV composition",
+                                    seg_dir
+                                );
                             }
                         }
                         Err(e) => {
-                            log::info!("No segment directory {:?} ({}); skipping final WAV composition", seg_dir, e);
+                            log::info!(
+                                "No segment directory {:?} ({}); skipping final WAV composition",
+                                seg_dir,
+                                e
+                            );
                         }
                     }
                 }
@@ -699,13 +793,20 @@ impl MeetingManager {
                     if let Some(generator) = generators.get_mut(&meeting_id_clone) {
                         match generator.generate_final_prd(&transcript_clone, &[]).await {
                             Ok(final_version) => {
-                                log::info!("Generated final PRD v{} for meeting {}", final_version.version, meeting_id_clone);
+                                log::info!(
+                                    "Generated final PRD v{} for meeting {}",
+                                    final_version.version,
+                                    meeting_id_clone
+                                );
 
                                 // Emit event to frontend
-                                let _ = app_handle_clone.emit("prd-version-generated", serde_json::json!({
-                                    "meeting_id": meeting_id_clone,
-                                    "version": final_version
-                                }));
+                                let _ = app_handle_clone.emit(
+                                    "prd-version-generated",
+                                    serde_json::json!({
+                                        "meeting_id": meeting_id_clone,
+                                        "version": final_version
+                                    }),
+                                );
                             }
                             Err(e) => {
                                 log::error!("Failed to generate final PRD: {}", e);
@@ -725,7 +826,10 @@ impl MeetingManager {
             // Finally, remove meeting from memory
             let mut meetings = self.active_meetings.lock().await;
             meetings.remove(meeting_id);
-            Ok(MeetingSummary { total_segments: meeting_snapshot.transcript_segments.len(), ..summary })
+            Ok(MeetingSummary {
+                total_segments: meeting_snapshot.transcript_segments.len(),
+                ..summary
+            })
         } else {
             Err(anyhow::anyhow!("Meeting not found: {}", meeting_id))
         }
@@ -787,7 +891,9 @@ impl MeetingManager {
             }
 
             // Update participants list
-            meeting.participants = meeting.participants.iter()
+            meeting.participants = meeting
+                .participants
+                .iter()
                 .map(|p| mapping.get(p).cloned().unwrap_or_else(|| p.clone()))
                 .collect();
 
@@ -830,7 +936,10 @@ impl MeetingManager {
         let mut accumulated_time: f64 = 0.0;
         // Append stats for SOAK instrumentation
         #[derive(Default, Clone)]
-        struct AppendStats { updates_written: u64, max_append_ms: u128 }
+        struct AppendStats {
+            updates_written: u64,
+            max_append_ms: u128,
+        }
         let stats = std::sync::Arc::new(tokio::sync::Mutex::new(AppendStats::default()));
         let mut last_soak_log = std::time::Instant::now();
 
@@ -857,8 +966,12 @@ impl MeetingManager {
             // Re-read chunk duration each iteration for live setting updates
             let settings = settings::get_settings(&app_handle);
             let mut chunk_secs = settings.transcription_chunk_seconds as f32;
-            if chunk_secs < 2.0 { chunk_secs = 2.0; }
-            if chunk_secs > 60.0 { chunk_secs = 60.0; }
+            if chunk_secs < 2.0 {
+                chunk_secs = 2.0;
+            }
+            if chunk_secs > 60.0 {
+                chunk_secs = 60.0;
+            }
             let chunk_duration = chunk_secs; // seconds
 
             // Sleep for the chunk duration
@@ -881,9 +994,16 @@ impl MeetingManager {
 
             // Get audio chunk from buffer
             let buffer_size = audio_manager.get_system_audio_buffer_size();
-            log::info!("System audio buffer size before read: {} samples", buffer_size);
+            log::info!(
+                "System audio buffer size before read: {} samples",
+                buffer_size
+            );
             let buffer_capacity = audio_manager.get_system_audio_buffer_capacity();
-            let fill_ratio = if buffer_capacity > 0 { buffer_size as f32 / buffer_capacity as f32 } else { 0.0 };
+            let fill_ratio = if buffer_capacity > 0 {
+                buffer_size as f32 / buffer_capacity as f32
+            } else {
+                0.0
+            };
             let overwritten_now = audio_manager.get_system_audio_overwritten_count();
             let overwritten_increase = overwritten_now.saturating_sub(last_overwritten);
             last_overwritten = overwritten_now;
@@ -931,17 +1051,21 @@ impl MeetingManager {
                             max_attempts: u32,
                         }
 
-                        let _ = app_handle.emit("audio-stream-restarting", AudioRestartPayload {
-                            meeting_id: meeting_id.clone(),
-                            attempt: restart_attempts + 1,
-                            max_attempts: MAX_RESTART_ATTEMPTS,
-                        });
+                        let _ = app_handle.emit(
+                            "audio-stream-restarting",
+                            AudioRestartPayload {
+                                meeting_id: meeting_id.clone(),
+                                attempt: restart_attempts + 1,
+                                max_attempts: MAX_RESTART_ATTEMPTS,
+                            },
+                        );
 
                         // Attempt restart in a blocking task (audio manager is sync)
                         let restart_result = tokio::task::spawn_blocking({
                             let audio_mgr = audio_manager.clone();
                             move || audio_mgr.restart_system_audio()
-                        }).await;
+                        })
+                        .await;
 
                         match restart_result {
                             Ok(Ok(())) => {
@@ -954,9 +1078,12 @@ impl MeetingManager {
                                     meeting_id: String,
                                 }
 
-                                let _ = app_handle.emit("audio-stream-restart-success", AudioRestartSuccessPayload {
-                                    meeting_id: meeting_id.clone(),
-                                });
+                                let _ = app_handle.emit(
+                                    "audio-stream-restart-success",
+                                    AudioRestartSuccessPayload {
+                                        meeting_id: meeting_id.clone(),
+                                    },
+                                );
 
                                 // Reset counters
                                 consecutive_empty_chunks = 0;
@@ -981,11 +1108,15 @@ impl MeetingManager {
 
                                 let err_str = e.to_string();
                                 audio_manager.record_restart_failure(err_str.clone());
-                                let _ = app_handle.emit("audio-stream-restart-failed", AudioRestartFailedPayload {
-                                    meeting_id: meeting_id.clone(),
-                                    error: err_str,
-                                    attempts_remaining: MAX_RESTART_ATTEMPTS.saturating_sub(restart_attempts),
-                                });
+                                let _ = app_handle.emit(
+                                    "audio-stream-restart-failed",
+                                    AudioRestartFailedPayload {
+                                        meeting_id: meeting_id.clone(),
+                                        error: err_str,
+                                        attempts_remaining: MAX_RESTART_ATTEMPTS
+                                            .saturating_sub(restart_attempts),
+                                    },
+                                );
                             }
                             Err(e) => {
                                 log::error!("Task join error during restart: {}", e);
@@ -1048,7 +1179,12 @@ impl MeetingManager {
             let rms = (sum_squares / audio_chunk.len() as f32).sqrt();
             let peak = audio_chunk.iter().map(|&x| x.abs()).fold(0.0f32, f32::max);
 
-            log::info!("Audio chunk stats - samples: {}, RMS: {:.6}, Peak: {:.6}", audio_chunk.len(), rms, peak);
+            log::info!(
+                "Audio chunk stats - samples: {}, RMS: {:.6}, Peak: {:.6}",
+                audio_chunk.len(),
+                rms,
+                peak
+            );
 
             if rms < 0.0001 {
                 log::warn!("Audio RMS is very low ({:.6}), audio may be silent", rms);
@@ -1058,11 +1194,26 @@ impl MeetingManager {
             let dbfs = 20.0 * (rms.max(1e-12)).log10();
             let th = settings::get_settings(&app_handle).system_audio_silence_threshold;
             if dbfs < th {
-                log::info!("Skipping transcription for silent chunk (dBFS {:.1} < threshold {:.1})", dbfs, th);
+                log::info!(
+                    "Skipping transcription for silent chunk (dBFS {:.1} < threshold {:.1})",
+                    dbfs,
+                    th
+                );
                 // Emit a lightweight event for diagnostics if desired
                 #[derive(Clone, Serialize)]
-                struct SilentChunkPayload { meeting_id: String, dbfs: f32, threshold: f32 }
-                let _ = app_handle.emit("audio-silent-chunk", SilentChunkPayload { meeting_id: meeting_id.clone(), dbfs, threshold: th });
+                struct SilentChunkPayload {
+                    meeting_id: String,
+                    dbfs: f32,
+                    threshold: f32,
+                }
+                let _ = app_handle.emit(
+                    "audio-silent-chunk",
+                    SilentChunkPayload {
+                        meeting_id: meeting_id.clone(),
+                        dbfs,
+                        threshold: th,
+                    },
+                );
                 continue;
             }
 
@@ -1070,22 +1221,39 @@ impl MeetingManager {
             let seg_dir = {
                 let meetings = active_meetings.lock().await;
                 if let Some(m) = meetings.get(&meeting_id) {
-                    if let Some(ref pp) = m.project_path { std::path::PathBuf::from(pp).join("audio_segments") }
-                    else { std::path::PathBuf::from("audio_segments") }
-                } else { std::path::PathBuf::from("audio_segments") }
+                    if let Some(ref pp) = m.project_path {
+                        std::path::PathBuf::from(pp).join("audio_segments")
+                    } else {
+                        std::path::PathBuf::from("audio_segments")
+                    }
+                } else {
+                    std::path::PathBuf::from("audio_segments")
+                }
             };
             if let Err(e) = std::fs::create_dir_all(&seg_dir) {
                 log::warn!("Failed to create segment dir {:?}: {}", seg_dir, e);
             } else {
                 let start_time = accumulated_time;
                 let end_time = start_time + chunk_duration as f64;
-                let fname = format!("segment_{:06}_{}-{}.wav", segment_index, (start_time * 1000.0) as u64, (end_time * 1000.0) as u64);
+                let fname = format!(
+                    "segment_{:06}_{}-{}.wav",
+                    segment_index,
+                    (start_time * 1000.0) as u64,
+                    (end_time * 1000.0) as u64
+                );
                 let fpath = seg_dir.join(fname);
                 if let Err(e) = (|| -> Result<(), anyhow::Error> {
                     use hound::{WavSpec, WavWriter};
-                    let spec = WavSpec { channels: 1, sample_rate: 16_000, bits_per_sample: 32, sample_format: hound::SampleFormat::Float };
+                    let spec = WavSpec {
+                        channels: 1,
+                        sample_rate: 16_000,
+                        bits_per_sample: 32,
+                        sample_format: hound::SampleFormat::Float,
+                    };
                     let mut w = WavWriter::create(&fpath, spec)?;
-                    for s in &audio_chunk { w.write_sample(*s)?; }
+                    for s in &audio_chunk {
+                        w.write_sample(*s)?;
+                    }
                     w.finalize()?;
                     Ok(())
                 })() {
@@ -1094,10 +1262,17 @@ impl MeetingManager {
                     log::info!("Persisted audio segment to {:?}", fpath);
                     // Enqueue for ASR worker if queue mode is enabled
                     if settings::get_settings(&app_handle).use_queue_transcription {
-                        if let Some(q) = app_handle.try_state::<std::sync::Arc<crate::queue::Queue>>() {
+                        if let Some(q) =
+                            app_handle.try_state::<std::sync::Arc<crate::queue::Queue>>()
+                        {
                             let start_ms = (start_time * 1000.0) as u64;
                             let end_ms = (end_time * 1000.0) as u64;
-                            if let Err(e) = q.enqueue(&meeting_id, start_ms, end_ms, fpath.to_string_lossy().as_ref()) {
+                            if let Err(e) = q.enqueue(
+                                &meeting_id,
+                                start_ms,
+                                end_ms,
+                                fpath.to_string_lossy().as_ref(),
+                            ) {
                                 log::error!("Failed to enqueue audio segment: {}", e);
                             } else {
                                 // Bump segment index and accumulated time; skip in-loop ASR when using queue.
@@ -1115,7 +1290,10 @@ impl MeetingManager {
                 let cur = settings::get_settings(&app_handle).transcription_chunk_seconds;
                 let new_secs = cur.saturating_sub(2).max(2).min(60);
                 if new_secs < cur {
-                    let _ = shortcut::change_transcription_chunk_seconds_setting(app_handle.clone(), new_secs);
+                    let _ = shortcut::change_transcription_chunk_seconds_setting(
+                        app_handle.clone(),
+                        new_secs,
+                    );
                     log::warn!("Backlog detected (fill {:.0}%, overwritten +{}). Reduced chunk seconds: {} -> {}",
                         fill_ratio * 100.0, overwritten_increase, cur, new_secs);
                     backlog_high_count = 0; // reset after action
@@ -1127,7 +1305,8 @@ impl MeetingManager {
                 let transcription_manager = transcription_manager.clone();
                 let audio_chunk = audio_chunk.clone();
                 move || transcription_manager.transcribe(audio_chunk)
-            }).await;
+            })
+            .await;
 
             let text = match transcription_result {
                 Ok(Ok(transcribed_text)) => transcribed_text,
@@ -1141,11 +1320,18 @@ impl MeetingManager {
                 }
             };
 
-            log::info!("Transcription result: '{}' (length: {} chars)", text, text.len());
+            log::info!(
+                "Transcription result: '{}' (length: {} chars)",
+                text,
+                text.len()
+            );
 
             // Skip empty transcriptions
             if text.trim().is_empty() {
-                log::warn!("Empty transcription returned from model, skipping segment {}", segment_index);
+                log::warn!(
+                    "Empty transcription returned from model, skipping segment {}",
+                    segment_index
+                );
                 continue;
             }
 
@@ -1191,10 +1377,13 @@ impl MeetingManager {
                 segment: TranscriptSegment,
             }
 
-            let _ = app_handle.emit("transcript-segment-added", SegmentAddedPayload {
-                meeting_id: meeting_id.clone(),
-                segment,
-            });
+            let _ = app_handle.emit(
+                "transcript-segment-added",
+                SegmentAddedPayload {
+                    meeting_id: meeting_id.clone(),
+                    segment,
+                },
+            );
 
             // Append rolling transcript line in project folder (non-blocking)
             if let Some(pp) = project_path_for_segment.clone() {
@@ -1210,7 +1399,12 @@ impl MeetingManager {
                 let meeting_id_clone = meeting_id.clone();
                 let idx = segment_index;
                 tokio::task::spawn_blocking(move || {
-                    if let Err(e) = crate::meeting::transcript_writer::append_segment(&pp, &meeting_id_clone, idx, &seg_clone) {
+                    if let Err(e) = crate::meeting::transcript_writer::append_segment(
+                        &pp,
+                        &meeting_id_clone,
+                        idx,
+                        &seg_clone,
+                    ) {
                         log::warn!("Failed to append transcript segment: {}", e);
                     }
                 });
@@ -1222,7 +1416,8 @@ impl MeetingManager {
             // Append meeting update on configured interval
             let settings_now = settings::get_settings(&app_handle);
             let interval_secs = settings_now.meeting_update_interval_seconds.clamp(5, 300);
-            let should_append_update = last_update_instant.elapsed() >= Duration::from_secs(interval_secs as u64);
+            let should_append_update =
+                last_update_instant.elapsed() >= Duration::from_secs(interval_secs as u64);
             if should_append_update {
                 let (project_path, segments_snapshot) = {
                     let meetings = active_meetings.lock().await;
@@ -1245,19 +1440,27 @@ impl MeetingManager {
                         let is_first_update = last_sent_index == 0;
 
                         // Use LLM summarization if enabled and API key is configured
-                        let summary = if settings_now.use_llm_summarization && crate::summarization::llm::has_api_key() {
-                            log::info!("Using LLM-based summarization (model: {})", settings_now.llm_model);
+                        let allow_llm = settings_now.use_llm_summarization
+                            && !settings_now.offline_mode_enabled
+                            && crate::summarization::llm::has_api_key();
+                        let summary = if allow_llm {
+                            log::info!(
+                                "Using LLM-based summarization (model: {})",
+                                settings_now.llm_model
+                            );
                             match crate::summarization::llm::summarize_with_llm(
                                 &settings_now.llm_model,
                                 new_segments,
                                 start_idx,
                                 end_idx,
                                 is_first_update,
-                            ).await {
+                            )
+                            .await
+                            {
                                 Ok(summary) => {
                                     log::info!("LLM summarization successful");
                                     summary
-                                },
+                                }
                                 Err(e) => {
                                     log::warn!("LLM summarization failed: {}, falling back to heuristic agent", e);
                                     // Fallback to heuristic agent
@@ -1281,12 +1484,19 @@ impl MeetingManager {
 
                         // Determine source label
                         let source_label = match audio_manager.get_audio_source() {
-                            crate::managers::audio::AudioSource::Microphone => "microphone".to_string(),
-                            crate::managers::audio::AudioSource::SystemAudio(_) => "system_audio".to_string(),
+                            crate::managers::audio::AudioSource::Microphone => {
+                                "microphone".to_string()
+                            }
+                            crate::managers::audio::AudioSource::SystemAudio(_) => {
+                                "system_audio".to_string()
+                            }
                         };
                         let meeting_name = {
                             let meetings = active_meetings.lock().await;
-                            meetings.get(&meeting_id).map(|m| m.name.clone()).unwrap_or_default()
+                            meetings
+                                .get(&meeting_id)
+                                .map(|m| m.name.clone())
+                                .unwrap_or_default()
                         };
                         let current_model = settings_now.selected_model.clone();
 
@@ -1320,11 +1530,19 @@ impl MeetingManager {
                                     }
                                     Err(e) => {
                                         last_err = Some(e);
-                                        if attempt >= 3 { update_id_opt = None; break; }
-                                        let backoff_ms = match attempt { 1 => 120, 2 => 360, _ => 750 };
+                                        if attempt >= 3 {
+                                            update_id_opt = None;
+                                            break;
+                                        }
+                                        let backoff_ms = match attempt {
+                                            1 => 120,
+                                            2 => 360,
+                                            _ => 750,
+                                        };
                                         log::warn!(
                                             "Append update failed (attempt {}), retrying in {}ms",
-                                            attempt, backoff_ms
+                                            attempt,
+                                            backoff_ms
                                         );
                                         tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
                                     }
@@ -1337,28 +1555,40 @@ impl MeetingManager {
                                 if let Some(_id) = update_id_opt {
                                     s.updates_written += 1;
                                 }
-                                if elapsed_ms > s.max_append_ms { s.max_append_ms = elapsed_ms; }
+                                if elapsed_ms > s.max_append_ms {
+                                    s.max_append_ms = elapsed_ms;
+                                }
                             }
 
                             if let Some(update_id) = update_id_opt {
                                 #[derive(Clone, Serialize)]
-                                struct UpdatePayload { update_id: u32, meeting_id: String }
+                                struct UpdatePayload {
+                                    update_id: u32,
+                                    meeting_id: String,
+                                }
                                 let _ = app_handle_clone.emit(
                                     "meeting-update-appended",
-                                    UpdatePayload { update_id, meeting_id: meeting_id_clone.clone() },
+                                    UpdatePayload {
+                                        update_id,
+                                        meeting_id: meeting_id_clone.clone(),
+                                    },
                                 );
                                 log::info!(
                                     "Appended meeting update {} for segments [{}..={}] in {}ms",
-                                    update_id, start_idx, end_idx, elapsed_ms
+                                    update_id,
+                                    start_idx,
+                                    end_idx,
+                                    elapsed_ms
                                 );
                                 // Attempt auto-trigger if enabled
                                 if let Some(pp) = Some(project_path_owned.clone()) {
-                                    let _ = crate::automation::claude_trigger::trigger_meeting_update(
-                                        &app_handle_clone,
-                                        &pp,
-                                        &meeting_id_clone,
-                                        update_id,
-                                    );
+                                    let _ =
+                                        crate::automation::claude_trigger::trigger_meeting_update(
+                                            &app_handle_clone,
+                                            &pp,
+                                            &meeting_id_clone,
+                                            update_id,
+                                        );
                                 }
 
                                 // Auto-commit, push, and create/update PR if enabled
@@ -1370,13 +1600,16 @@ impl MeetingManager {
 
                                 tokio::spawn(async move {
                                     // Auto-commit and push
-                                    if let Ok(branch) = crate::automation::github_workflow::auto_commit_and_push(
-                                        &app_clone,
-                                        &pp_clone,
-                                        &mid_clone,
-                                        &mname_clone,
-                                        update_id,
-                                    ).await {
+                                    if let Ok(branch) =
+                                        crate::automation::github_workflow::auto_commit_and_push(
+                                            &app_clone,
+                                            &pp_clone,
+                                            &mid_clone,
+                                            &mname_clone,
+                                            update_id,
+                                        )
+                                        .await
+                                    {
                                         log::info!("GITHUB_WORKFLOW successfully committed and pushed update #{} to branch '{}'", update_id, branch);
 
                                         // Auto-create or update PR
@@ -1400,7 +1633,10 @@ impl MeetingManager {
                                     }
                                 });
                             } else if let Some(err) = last_err {
-                                log::error!("Failed to append meeting update after retries: {}", err);
+                                log::error!(
+                                    "Failed to append meeting update after retries: {}",
+                                    err
+                                );
                             }
                         });
 
@@ -1427,11 +1663,18 @@ impl MeetingManager {
                                         } else {
                                             // Generate update if enough time has passed (using interval in minutes)
                                             if let Some(last_version) = versions.last() {
-                                                if let Ok(last_time) = chrono::DateTime::parse_from_rfc3339(&last_version.generated_at) {
+                                                if let Ok(last_time) =
+                                                    chrono::DateTime::parse_from_rfc3339(
+                                                        &last_version.generated_at,
+                                                    )
+                                                {
                                                     let now = chrono::Utc::now();
-                                                    let last_time_utc = last_time.with_timezone(&chrono::Utc);
-                                                    let elapsed_minutes = (now - last_time_utc).num_minutes() as u64;
-                                                    elapsed_minutes >= settings_now.prd_update_interval_minutes
+                                                    let last_time_utc =
+                                                        last_time.with_timezone(&chrono::Utc);
+                                                    let elapsed_minutes =
+                                                        (now - last_time_utc).num_minutes() as u64;
+                                                    elapsed_minutes
+                                                        >= settings_now.prd_update_interval_minutes
                                                 } else {
                                                     false
                                                 }
@@ -1445,7 +1688,10 @@ impl MeetingManager {
                                 };
 
                                 if should_generate {
-                                    log::info!("Auto-generating PRD for meeting {}", meeting_id_prd);
+                                    log::info!(
+                                        "Auto-generating PRD for meeting {}",
+                                        meeting_id_prd
+                                    );
 
                                     // Get transcript segments
                                     let transcript = segments_snapshot.clone();
@@ -1455,20 +1701,31 @@ impl MeetingManager {
                                         let is_initial = generator.get_all_versions().is_empty();
 
                                         let result = if is_initial {
-                                            generator.generate_initial_prd(&transcript, &[], None).await
+                                            generator
+                                                .generate_initial_prd(&transcript, &[], None)
+                                                .await
                                         } else {
-                                            generator.generate_incremental_update(&transcript, &[]).await
+                                            generator
+                                                .generate_incremental_update(&transcript, &[])
+                                                .await
                                         };
 
                                         match result {
                                             Ok(version) => {
-                                                log::info!("Generated PRD v{} for meeting {}", version.version, meeting_id_prd);
+                                                log::info!(
+                                                    "Generated PRD v{} for meeting {}",
+                                                    version.version,
+                                                    meeting_id_prd
+                                                );
 
                                                 // Emit event to frontend
-                                                let _ = app_handle_prd.emit("prd-version-generated", serde_json::json!({
-                                                    "meeting_id": meeting_id_prd,
-                                                    "version": version
-                                                }));
+                                                let _ = app_handle_prd.emit(
+                                                    "prd-version-generated",
+                                                    serde_json::json!({
+                                                        "meeting_id": meeting_id_prd,
+                                                        "version": version
+                                                    }),
+                                                );
                                             }
                                             Err(e) => {
                                                 log::error!("Failed to auto-generate PRD: {}", e);
@@ -1487,12 +1744,19 @@ impl MeetingManager {
                 let (project_path_opt, s) = {
                     let s = stats.lock().await.clone();
                     let meetings = active_meetings.lock().await;
-                    (meetings.get(&meeting_id).and_then(|m| m.project_path.clone()), s)
+                    (
+                        meetings
+                            .get(&meeting_id)
+                            .and_then(|m| m.project_path.clone()),
+                        s,
+                    )
                 };
                 let mut size_bytes = 0u64;
                 if let Some(pp) = project_path_opt {
                     let path = std::path::Path::new(&pp).join(".meeting-updates.jsonl");
-                    if let Ok(md) = std::fs::metadata(path) { size_bytes = md.len(); }
+                    if let Ok(md) = std::fs::metadata(path) {
+                        size_bytes = md.len();
+                    }
                 }
                 log::info!(
                     "SOAK updates_written={} jsonl_size_bytes={} max_append_latency_ms={}",
@@ -1535,7 +1799,10 @@ mod tests {
         // let manager = MeetingManager::new(app_handle, audio_manager, transcription_manager).unwrap();
 
         // Start meeting
-        let meeting_id = manager.start_meeting("Test Meeting".to_string()).await.unwrap();
+        let meeting_id = manager
+            .start_meeting("Test Meeting".to_string())
+            .await
+            .unwrap();
         assert!(!meeting_id.is_empty());
 
         // Get meeting
@@ -1544,14 +1811,20 @@ mod tests {
         assert_eq!(meeting.status, MeetingStatus::Recording);
 
         // Add segment
-        manager.add_segment(&meeting_id, TranscriptSegment {
-            speaker: "Speaker 1".to_string(),
-            start_time: 0.0,
-            end_time: 3.5,
-            text: "Hello world".to_string(),
-            confidence: 0.95,
-            timestamp: SystemTime::now(),
-        }).await.unwrap();
+        manager
+            .add_segment(
+                &meeting_id,
+                TranscriptSegment {
+                    speaker: "Speaker 1".to_string(),
+                    start_time: 0.0,
+                    end_time: 3.5,
+                    text: "Hello world".to_string(),
+                    confidence: 0.95,
+                    timestamp: SystemTime::now(),
+                },
+            )
+            .await
+            .unwrap();
 
         // Get transcript
         let transcript = manager.get_live_transcript(&meeting_id).await.unwrap();
@@ -1569,7 +1842,7 @@ mod tests {
     async fn test_pause_resume() {
         // TODO: Set up test harness with mock managers
         return; // Temporarily disabled
-        // let manager = MeetingManager::new(app_handle, audio_manager, transcription_manager).unwrap();
+                // let manager = MeetingManager::new(app_handle, audio_manager, transcription_manager).unwrap();
         let meeting_id = manager.start_meeting("Test".to_string()).await.unwrap();
 
         // Pause
@@ -1590,34 +1863,49 @@ mod tests {
     async fn test_speaker_label_update() {
         // TODO: Set up test harness with mock managers
         return; // Temporarily disabled
-        // let manager = MeetingManager::new(app_handle, audio_manager, transcription_manager).unwrap();
+                // let manager = MeetingManager::new(app_handle, audio_manager, transcription_manager).unwrap();
         let meeting_id = manager.start_meeting("Test".to_string()).await.unwrap();
 
         // Add segments with generic labels
-        manager.add_segment(&meeting_id, TranscriptSegment {
-            speaker: "Speaker 1".to_string(),
-            start_time: 0.0,
-            end_time: 2.0,
-            text: "First".to_string(),
-            confidence: 0.9,
-            timestamp: SystemTime::now(),
-        }).await.unwrap();
+        manager
+            .add_segment(
+                &meeting_id,
+                TranscriptSegment {
+                    speaker: "Speaker 1".to_string(),
+                    start_time: 0.0,
+                    end_time: 2.0,
+                    text: "First".to_string(),
+                    confidence: 0.9,
+                    timestamp: SystemTime::now(),
+                },
+            )
+            .await
+            .unwrap();
 
-        manager.add_segment(&meeting_id, TranscriptSegment {
-            speaker: "Speaker 2".to_string(),
-            start_time: 2.0,
-            end_time: 4.0,
-            text: "Second".to_string(),
-            confidence: 0.9,
-            timestamp: SystemTime::now(),
-        }).await.unwrap();
+        manager
+            .add_segment(
+                &meeting_id,
+                TranscriptSegment {
+                    speaker: "Speaker 2".to_string(),
+                    start_time: 2.0,
+                    end_time: 4.0,
+                    text: "Second".to_string(),
+                    confidence: 0.9,
+                    timestamp: SystemTime::now(),
+                },
+            )
+            .await
+            .unwrap();
 
         // Update labels
         let mut mapping = HashMap::new();
         mapping.insert("Speaker 1".to_string(), "Alice".to_string());
         mapping.insert("Speaker 2".to_string(), "Bob".to_string());
 
-        manager.update_speaker_labels(&meeting_id, mapping).await.unwrap();
+        manager
+            .update_speaker_labels(&meeting_id, mapping)
+            .await
+            .unwrap();
 
         // Verify updates
         let transcript = manager.get_live_transcript(&meeting_id).await.unwrap();

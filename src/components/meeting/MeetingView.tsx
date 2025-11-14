@@ -9,6 +9,7 @@ import { AudioSetupSection } from "./AudioSetupSection";
 import { PRDView } from "./PRDView";
 import { TranscriptSegment, MeetingSummary } from "../../lib/types";
 import { toast } from "sonner";
+import { useSettings } from "../../hooks/useSettings";
 
 type MeetingTab = "checklist" | "transcript" | "updates" | "prd";
 
@@ -19,6 +20,10 @@ export const MeetingView = () => {
   const [isStarting, setIsStarting] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
   const [activeTab, setActiveTab] = useState<MeetingTab>("checklist");
+  const { getSetting } = useSettings();
+  const advancedEnabled = getSetting("advanced_features_enabled") ?? false;
+  const offlineMode = getSetting("offline_mode_enabled") ?? false;
+  const automationLocked = !advancedEnabled || offlineMode;
 
   // Reattach to an active meeting if user navigates away and back
   useEffect(() => {
@@ -339,22 +344,24 @@ export const MeetingView = () => {
                 Transcript
               </button>
               <button
-                onClick={() => setActiveTab("updates")}
+                onClick={() => !automationLocked && setActiveTab("updates")}
+                disabled={automationLocked}
                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === "updates"
                     ? "border-background-ui text-foreground"
                     : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
+                } ${automationLocked ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 Updates
               </button>
               <button
-                onClick={() => setActiveTab("prd")}
+                onClick={() => !automationLocked && setActiveTab("prd")}
+                disabled={automationLocked}
                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === "prd"
                     ? "border-background-ui text-foreground"
                     : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
+                } ${automationLocked ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 PRD
               </button>
@@ -376,11 +383,25 @@ export const MeetingView = () => {
             )}
 
             {activeTab === "updates" && (
-              <MeetingUpdates meetingId={activeMeetingId} meetingName={meetingName} />
+              automationLocked ? (
+                <div className="rounded-md border border-border p-4 text-sm text-muted-foreground">
+                  Meeting updates require Advanced mode with network access. {offlineMode
+                    ? "Disable Offline Mode to resume automation."
+                    : "Toggle Advanced Automations in General → Modes."}
+                </div>
+              ) : (
+                <MeetingUpdates meetingId={activeMeetingId} meetingName={meetingName} />
+              )
             )}
 
             {activeTab === "prd" && (
-              <PRDView meetingId={activeMeetingId} />
+              automationLocked ? (
+                <div className="rounded-md border border-border p-4 text-sm text-muted-foreground">
+                  PRD drafts rely on the same automation pipeline. Enable Advanced mode and stay online to generate structured updates.
+                </div>
+              ) : (
+                <PRDView meetingId={activeMeetingId} />
+              )
             )}
           </div>
         </div>

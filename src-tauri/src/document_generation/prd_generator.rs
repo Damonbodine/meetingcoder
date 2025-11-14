@@ -32,10 +32,7 @@ impl PRDGenerator {
     pub fn load(meeting_id: String, meeting_name: String) -> Result<Self> {
         let versions = get_all_versions(&meeting_id)?;
 
-        let last_segment_processed = versions
-            .last()
-            .map(|v| v.segment_range.1)
-            .unwrap_or(0);
+        let last_segment_processed = versions.last().map(|v| v.segment_range.1).unwrap_or(0);
 
         Ok(Self {
             meeting_id,
@@ -79,10 +76,7 @@ impl PRDGenerator {
         feature_extractions: &[SummarizationOutput],
         project_context: Option<String>,
     ) -> Result<PRDVersion> {
-        log::info!(
-            "Generating initial PRD for meeting {}",
-            self.meeting_id
-        );
+        log::info!("Generating initial PRD for meeting {}", self.meeting_id);
 
         // Extract PRD content using LLM
         let content = self
@@ -361,7 +355,10 @@ impl PRDGenerator {
                 Ok(content)
             }
             Err(e) => {
-                log::warn!("LLM PRD extraction failed: {}, falling back to heuristic", e);
+                log::warn!(
+                    "LLM PRD extraction failed: {}, falling back to heuristic",
+                    e
+                );
                 self.extract_prd_content_heuristic(extractions, previous_content)
             }
         }

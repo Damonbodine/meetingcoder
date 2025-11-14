@@ -31,7 +31,9 @@ fn read_automation_state(project_path: &str) -> AutomationState {
 
 fn write_automation_state(project_path: &str, state: &AutomationState) -> Result<()> {
     let p = Path::new(project_path).join(".claude/.automation-state.json");
-    if let Some(parent) = p.parent() { fs::create_dir_all(parent)?; }
+    if let Some(parent) = p.parent() {
+        fs::create_dir_all(parent)?;
+    }
     fs::write(p, serde_json::to_vec_pretty(state)?)?;
     Ok(())
 }
@@ -47,15 +49,19 @@ fn validate_project_path(path: &str) -> Result<String> {
 
     // Canonicalize the path (resolves symlinks and validates existence)
     let path_obj = Path::new(path);
-    let canonical = path_obj.canonicalize()
+    let canonical = path_obj
+        .canonicalize()
         .map_err(|_| anyhow!("Invalid project path: {}", path))?;
 
-    let path_str = canonical.to_str()
+    let path_str = canonical
+        .to_str()
         .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters"))?;
 
     // Security: Reject paths containing characters that could break shell escaping
     // Even with proper escaping, we defensively reject suspicious paths
-    let dangerous_chars = ['"', '\'', '`', '$', '\\', '\n', '\r', ';', '&', '|', '<', '>'];
+    let dangerous_chars = [
+        '"', '\'', '`', '$', '\\', '\n', '\r', ';', '&', '|', '<', '>',
+    ];
     if path_str.chars().any(|c| dangerous_chars.contains(&c)) {
         return Err(anyhow!("Path contains unsafe characters: {}", path_str));
     }
@@ -75,13 +81,12 @@ fn escape_path_for_applescript(path: &str) -> String {
 fn run_osascript(script: &str) -> Result<()> {
     #[cfg(target_os = "macos")]
     {
-        let output = Command::new("osascript")
-            .arg("-e")
-            .arg(script)
-            .output()?;
+        let output = Command::new("osascript").arg("-e").arg(script).output()?;
         if !output.status.success() {
-            return Err(anyhow!("osascript failed: {}",
-                String::from_utf8_lossy(&output.stderr)));
+            return Err(anyhow!(
+                "osascript failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
         }
         Ok(())
     }
@@ -106,9 +111,7 @@ pub fn trigger_meeting_update(
     let is_forced = update_id == 0;
 
     // Effective debounce interval
-    let min_interval = settings
-        .auto_trigger_min_interval_seconds
-        .clamp(30, 600) as u64;
+    let min_interval = settings.auto_trigger_min_interval_seconds.clamp(30, 600) as u64;
 
     // Merge in-memory tracker with persisted automation state
     let mut map = LAST_TRIGGERS.lock().unwrap();
@@ -118,7 +121,11 @@ pub fn trigger_meeting_update(
     if !is_forced {
         // Check newness vs persisted
         if persisted.last_trigger_update_id >= update_id {
-            log::info!("AUTOMATION skip: no new update (last={}, got={})", persisted.last_trigger_update_id, update_id);
+            log::info!(
+                "AUTOMATION skip: no new update (last={}, got={})",
+                persisted.last_trigger_update_id,
+                update_id
+            );
             return Ok(false);
         }
         // Check debounce vs in-memory
@@ -250,16 +257,24 @@ pub fn open_project_in_vscode(project_path: &str) -> Result<()> {
     {
         // Try VS Code CLI with new window flag
         if let Ok(out_cli) = Command::new("code").arg("-n").arg(&validated_path).output() {
-            if out_cli.status.success() { return Ok(()); }
+            if out_cli.status.success() {
+                return Ok(());
+            }
         }
         // Fallback to macOS open with app
         if let Ok(out) = Command::new("open")
             .arg("-a")
             .arg("Visual Studio Code")
             .arg(&validated_path)
-            .output() {
-            if out.status.success() { return Ok(()); }
-            return Err(anyhow!("Failed to open VS Code: {}", String::from_utf8_lossy(&out.stderr)));
+            .output()
+        {
+            if out.status.success() {
+                return Ok(());
+            }
+            return Err(anyhow!(
+                "Failed to open VS Code: {}",
+                String::from_utf8_lossy(&out.stderr)
+            ));
         }
         return Err(anyhow!("Failed to open VS Code: open command failed"));
     }
@@ -269,7 +284,10 @@ pub fn open_project_in_vscode(project_path: &str) -> Result<()> {
         let out = Command::new("code").arg(&validated_path).output();
         match out {
             Ok(o) if o.status.success() => Ok(()),
-            Ok(o) => Err(anyhow!("Failed to open VS Code: {}", String::from_utf8_lossy(&o.stderr))),
+            Ok(o) => Err(anyhow!(
+                "Failed to open VS Code: {}",
+                String::from_utf8_lossy(&o.stderr)
+            )),
             Err(e) => Err(anyhow!("Failed to run code: {}", e)),
         }
     }
@@ -282,12 +300,24 @@ pub fn open_project_in_cursor(project_path: &str) -> Result<()> {
     {
         // Prefer Cursor CLI if available
         if let Ok(out2) = Command::new("cursor").arg(&validated_path).output() {
-            if out2.status.success() { return Ok(()); }
+            if out2.status.success() {
+                return Ok(());
+            }
         }
         // Fallback to open -a "Cursor"
-        if let Ok(out) = Command::new("open").arg("-a").arg("Cursor").arg(&validated_path).output() {
-            if out.status.success() { return Ok(()); }
-            return Err(anyhow!("Failed to open Cursor: {}", String::from_utf8_lossy(&out.stderr)));
+        if let Ok(out) = Command::new("open")
+            .arg("-a")
+            .arg("Cursor")
+            .arg(&validated_path)
+            .output()
+        {
+            if out.status.success() {
+                return Ok(());
+            }
+            return Err(anyhow!(
+                "Failed to open Cursor: {}",
+                String::from_utf8_lossy(&out.stderr)
+            ));
         }
         Err(anyhow!("Failed to open Cursor editor"))
     }
@@ -295,7 +325,9 @@ pub fn open_project_in_cursor(project_path: &str) -> Result<()> {
     {
         // Non-macOS: attempt a 'cursor' CLI if present
         if let Ok(out2) = Command::new("cursor").arg(&validated_path).output() {
-            if out2.status.success() { return Ok(()); }
+            if out2.status.success() {
+                return Ok(());
+            }
         }
         Err(anyhow!("Cursor opening not implemented on this OS"))
     }

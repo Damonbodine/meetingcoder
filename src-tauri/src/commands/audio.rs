@@ -4,6 +4,8 @@ use crate::managers::audio::{AudioRecordingManager, AudioSource, MicrophoneMode}
 use crate::settings::{get_settings, write_settings};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+#[cfg(target_os = "macos")]
+use std::{path::PathBuf, process::Command};
 use tauri::{AppHandle, Manager};
 
 #[derive(Serialize)]
@@ -165,10 +167,7 @@ pub fn play_test_sound(app: AppHandle, sound_type: String) {
 /* ──────────────────────────────────────────────────────────────── */
 
 #[tauri::command]
-pub fn set_system_audio_source(
-    app: AppHandle,
-    device_name: String,
-) -> Result<(), String> {
+pub fn set_system_audio_source(app: AppHandle, device_name: String) -> Result<(), String> {
     let rm = app.state::<Arc<AudioRecordingManager>>();
 
     rm.set_audio_source(AudioSource::SystemAudio(device_name))
@@ -200,10 +199,7 @@ pub fn get_system_audio_buffer_size(app: AppHandle) -> Result<usize, String> {
 }
 
 #[tauri::command]
-pub fn save_system_audio_buffer_to_wav(
-    app: AppHandle,
-    filename: String,
-) -> Result<String, String> {
+pub fn save_system_audio_buffer_to_wav(app: AppHandle, filename: String) -> Result<String, String> {
     let rm = app.state::<Arc<AudioRecordingManager>>();
     rm.save_system_audio_buffer_to_wav(&filename)
         .map_err(|e| format!("Failed to save WAV: {}", e))
@@ -239,12 +235,24 @@ pub struct AudioMetrics {
     queue_backlog_seconds: f32,
 }
 
+#[derive(Serialize)]
+pub struct BackgroundMusicStatus {
+    pub supported: bool,
+    pub installed: bool,
+    pub running: bool,
+    pub install_paths: Vec<String>,
+}
+
 #[tauri::command]
 pub fn get_audio_metrics(app: AppHandle) -> Result<AudioMetrics, String> {
     let rm = app.state::<Arc<AudioRecordingManager>>();
     let size = rm.get_system_audio_buffer_size();
     let cap = rm.get_system_audio_buffer_capacity();
-    let percent = if cap > 0 { (size as f32 / cap as f32) * 100.0 } else { 0.0 };
+    let percent = if cap > 0 {
+        (size as f32 / cap as f32) * 100.0
+    } else {
+        0.0
+    };
     let overwritten = rm.get_system_audio_overwritten_count();
     let dev_rate = rm.get_device_sample_rate();
     let ratio = rm.get_resample_ratio();
@@ -257,13 +265,16 @@ pub fn get_audio_metrics(app: AppHandle) -> Result<AudioMetrics, String> {
     let device_name = rm.get_current_device_name();
     let is_capturing = rm.is_system_audio_capturing();
     let backlog_secs_estimate = size as f32 / 16_000.0; // mono 16kHz
-    // Queue metrics
-    let (q_queued, q_processing, q_backlog_secs) = if let Some(q) = app.try_state::<Arc<crate::queue::Queue>>() {
-        match (q.counts(), q.backlog_seconds()) {
-            (Ok((a,b,_)), Ok(backlog)) => (a,b,backlog),
-            _ => (0,0,0.0)
-        }
-    } else { (0,0,0.0) };
+                                                        // Queue metrics
+    let (q_queued, q_processing, q_backlog_secs) =
+        if let Some(q) = app.try_state::<Arc<crate::queue::Queue>>() {
+            match (q.counts(), q.backlog_seconds()) {
+                (Ok((a, b, _)), Ok(backlog)) => (a, b, backlog),
+                _ => (0, 0, 0.0),
+            }
+        } else {
+            (0, 0, 0.0)
+        };
 
     Ok(AudioMetrics {
         buffer_size_samples: size,
@@ -291,4 +302,65 @@ pub fn get_audio_metrics(app: AppHandle) -> Result<AudioMetrics, String> {
 pub fn get_audio_errors(app: AppHandle) -> Result<Vec<String>, String> {
     let rm = app.state::<Arc<AudioRecordingManager>>();
     Ok(rm.get_recent_audio_errors())
+}
+
+#[tauri::command]
+pub fn get_background_music_status() -> BackgroundMusicStatus {
+    background_music_status_impl()
+}
+
+#[cfg(target_os = "macos")]
+fn background_music_status_impl() -> BackgroundMusicStatus {
+    let install_paths = background_music_candidate_paths()
+        .into_iter()
+        .filter(|path| path.exists())
+        .map(|path| path.display().to_string())
+        .collect::<Vec<_>>();
+
+    let installed = !install_paths.is_empty();
+    let running = is_background_music_running();
+
+    BackgroundMusicStatus {
+        supported: true,
+        installed,
+        running,
+        install_paths,
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn background_music_status_impl() -> BackgroundMusicStatus {
+    BackgroundMusicStatus {
+        supported: false,
+        installed: false,
+        running: false,
+        install_paths: Vec::new(),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn background_music_candidate_paths() -> Vec<PathBuf> {
+    let mut paths = vec![
+        PathBuf::from("/Applications/Background Music.app"),
+        PathBuf::from("/Applications/BackgroundMusic.app"),
+    ];
+
+    if let Some(home) = dirs::home_dir() {
+        paths.push(home.join("Applications/Background Music.app"));
+        paths.push(home.join("Applications/BackgroundMusic.app"));
+    }
+
+    paths
+}
+
+#[cfg(target_os = "macos")]
+fn is_background_music_running() -> bool {
+    for cmd in ["/usr/bin/pgrep", "/bin/pgrep", "pgrep"] {
+        if let Ok(status) = Command::new(cmd).args(["-f", "Background Music"]).status() {
+            if status.success() {
+                return true;
+            }
+        }
+    }
+    false
 }

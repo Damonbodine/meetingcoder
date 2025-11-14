@@ -113,7 +113,10 @@ impl HistoryManager {
         // Security: Validate transcription text length to prevent resource exhaustion
         const MAX_TEXT_LENGTH: usize = 100_000; // 100KB limit
         if transcription_text.len() > MAX_TEXT_LENGTH {
-            return Err(anyhow!("Transcription text exceeds maximum length of {} bytes", MAX_TEXT_LENGTH));
+            return Err(anyhow!(
+                "Transcription text exceeds maximum length of {} bytes",
+                MAX_TEXT_LENGTH
+            ));
         }
 
         let timestamp = Utc::now().timestamp();
@@ -259,9 +262,12 @@ impl HistoryManager {
         // Canonicalize both paths for comparison (if file exists)
         // If file doesn't exist yet, just verify the parent directory
         if path.exists() {
-            let canonical_path = path.canonicalize()
+            let canonical_path = path
+                .canonicalize()
                 .map_err(|e| anyhow!("Failed to resolve file path: {}", e))?;
-            let canonical_recordings = self.recordings_dir.canonicalize()
+            let canonical_recordings = self
+                .recordings_dir
+                .canonicalize()
                 .map_err(|e| anyhow!("Failed to resolve recordings directory: {}", e))?;
 
             if !canonical_path.starts_with(&canonical_recordings) {

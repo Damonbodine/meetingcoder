@@ -4,7 +4,10 @@ use crate::system_audio::{ring_buffer::SpscRingBuffer, SendableSystemAudio};
 use crate::utils;
 use log::{debug, info};
 use std::collections::VecDeque;
-use std::sync::{Arc, Mutex, atomic::{AtomicU64, Ordering}};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc, Mutex,
+};
 use std::time::{Duration, Instant};
 use tauri::Manager;
 
@@ -402,9 +405,8 @@ impl AudioRecordingManager {
         };
 
         // Stop current capture
-        self.stop_system_audio().map_err(|e| {
-            anyhow::anyhow!("Failed to stop audio during restart: {}", e)
-        })?;
+        self.stop_system_audio()
+            .map_err(|e| anyhow::anyhow!("Failed to stop audio during restart: {}", e))?;
 
         // Clear the audio buffer to prevent corrupted samples
         info!("Clearing audio buffer during restart");
@@ -478,9 +480,7 @@ impl AudioRecordingManager {
 
         // Silence gating: compute RMS; track below-threshold chunks for diagnostics
         if !chunk.is_empty() {
-            let rms = (
-                chunk.iter().map(|v| v * v).sum::<f32>() / (chunk.len() as f32)
-            ).sqrt();
+            let rms = (chunk.iter().map(|v| v * v).sum::<f32>() / (chunk.len() as f32)).sqrt();
             let dbfs = 20.0 * (rms.max(1e-12)).log10();
             let settings = get_settings(&self.app_handle);
             if dbfs < settings.system_audio_silence_threshold {
@@ -563,30 +563,48 @@ impl AudioRecordingManager {
     pub fn record_restart_attempt(&self) {
         self.restart_attempts_total.fetch_add(1, Ordering::Relaxed);
         // Clear last error before a new attempt
-        if let Ok(mut e) = self.last_restart_error.lock() { *e = None; }
+        if let Ok(mut e) = self.last_restart_error.lock() {
+            *e = None;
+        }
         // Track attempt time for rate limiting metrics
         if let Ok(mut times) = self.restart_attempt_times.lock() {
             let now = Instant::now();
             times.push_back(now);
             // Retain only last hour worth of attempts
             let cutoff = now - Duration::from_secs(3600);
-            while let Some(&front) = times.front() { if front < cutoff { times.pop_front(); } else { break; } }
+            while let Some(&front) = times.front() {
+                if front < cutoff {
+                    times.pop_front();
+                } else {
+                    break;
+                }
+            }
         }
         // Update last attempt timestamp for cooldown computation
-        if let Ok(mut t) = self.last_restart_attempt.lock() { *t = Some(Instant::now()); }
+        if let Ok(mut t) = self.last_restart_attempt.lock() {
+            *t = Some(Instant::now());
+        }
     }
     pub fn record_restart_success(&self) {
         self.restart_successes.fetch_add(1, Ordering::Relaxed);
-        if let Ok(mut e) = self.last_restart_error.lock() { *e = None; }
+        if let Ok(mut e) = self.last_restart_error.lock() {
+            *e = None;
+        }
         // On success, reset cooldown marker
-        if let Ok(mut t) = self.last_restart_attempt.lock() { *t = None; }
+        if let Ok(mut t) = self.last_restart_attempt.lock() {
+            *t = None;
+        }
     }
     pub fn record_restart_failure(&self, err: String) {
-        if let Ok(mut e) = self.last_restart_error.lock() { *e = Some(err.clone()); }
+        if let Ok(mut e) = self.last_restart_error.lock() {
+            *e = Some(err.clone());
+        }
         // Append to recent errors log (most recent first, max 10)
         if let Ok(mut q) = self.recent_errors.lock() {
             q.push_front(err);
-            while q.len() > 10 { q.pop_back(); }
+            while q.len() > 10 {
+                q.pop_back();
+            }
         }
     }
     pub fn get_restart_attempts_total(&self) -> u64 {
@@ -604,9 +622,17 @@ impl AudioRecordingManager {
         if let Ok(mut times) = self.restart_attempt_times.lock() {
             let now = Instant::now();
             let cutoff = now - Duration::from_secs(3600);
-            while let Some(&front) = times.front() { if front < cutoff { times.pop_front(); } else { break; } }
+            while let Some(&front) = times.front() {
+                if front < cutoff {
+                    times.pop_front();
+                } else {
+                    break;
+                }
+            }
             times.len() as u64
-        } else { 0 }
+        } else {
+            0
+        }
     }
 
     /// Cooldown remaining (seconds) before next eligible restart attempt, based on 30s policy.
@@ -642,7 +668,8 @@ impl AudioRecordingManager {
         }
 
         // Save to Desktop for easy access
-        let desktop_dir = self.app_handle
+        let desktop_dir = self
+            .app_handle
             .path()
             .desktop_dir()
             .map_err(|e| anyhow::anyhow!("Failed to get desktop dir: {}", e))?;
@@ -660,7 +687,9 @@ impl AudioRecordingManager {
 
         // Drain all current samples for saving (debug behavior)
         let data = buffer.drain_n(avail);
-        for sample in data.iter() { writer.write_sample(*sample)?; }
+        for sample in data.iter() {
+            writer.write_sample(*sample)?;
+        }
 
         writer.finalize()?;
 

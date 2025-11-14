@@ -1,95 +1,39 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use std::env;
-use std::fs;
-use std::path::Path;
 
 const KEYCHAIN_SERVICE: &str = "com.meetingcoder.app";
 const KEYCHAIN_ACCOUNT: &str = "claude_api_key";
 
-/// Fallback API key storage path for when keyring fails (development mode)
-fn get_api_key_fallback_path() -> Result<std::path::PathBuf> {
-    let home = env::var("HOME")
-        .or_else(|_| env::var("USERPROFILE"))
-        .map_err(|_| anyhow!("Could not determine home directory"))?;
-    let config_dir = Path::new(&home).join(".handy");
-    fs::create_dir_all(&config_dir)?;
-    Ok(config_dir.join(".claude-api-key"))
-}
-
-/// Store Claude API key securely using keyring with fallback
+/// Store Claude API key securely using the OS keychain
 pub fn store_api_key(api_key: &str) -> Result<()> {
-    log::info!("Attempting to store Claude API key (length: {})", api_key.len());
-
-    // Try keyring first
-    let keyring_result = (|| -> Result<()> {
-        let entry = keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
-            .map_err(|e| anyhow!("Failed to create keyring entry: {}", e))?;
-        entry
-            .set_password(api_key)
-            .map_err(|e| anyhow!("Failed to store API key in keyring: {}", e))?;
-        log::info!("Successfully stored Claude API key in system keyring");
-        Ok(())
-    })();
-
-    if keyring_result.is_ok() {
-        return Ok(());
-    }
-
-    // Fallback to file-based storage
-    log::warn!(
-        "Keyring storage failed: {:?}, falling back to file storage",
-        keyring_result
-    );
-    let fallback_path = get_api_key_fallback_path()?;
-    fs::write(&fallback_path, api_key)?;
     log::info!(
-        "Stored Claude API key in fallback file: {}",
-        fallback_path.display()
+        "Attempting to store Claude API key (length: {})",
+        api_key.len()
     );
+
+    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
+        .map_err(|e| anyhow!("Failed to create keyring entry: {}", e))?;
+    entry
+        .set_password(api_key)
+        .map_err(|e| anyhow!("Failed to store API key in keyring: {}", e))?;
+    log::info!("Successfully stored Claude API key in system keyring");
     Ok(())
 }
 
-/// Retrieve Claude API key from keyring or fallback
+/// Retrieve Claude API key from the OS keychain
 pub fn get_api_key() -> Result<String> {
-    // Try keyring first
-    let keyring_result = (|| -> Result<String> {
-        let entry = keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
-            .map_err(|e| anyhow!("Failed to create keyring entry: {}", e))?;
-        let key = entry
-            .get_password()
-            .map_err(|e| anyhow!("Failed to retrieve API key from keyring: {}", e))?;
-        Ok(key)
-    })();
-
-    if let Ok(key) = keyring_result {
-        return Ok(key);
-    }
-
-    // Try fallback file
-    let fallback_path = get_api_key_fallback_path()?;
-    if fallback_path.exists() {
-        let key = fs::read_to_string(&fallback_path)?;
-        return Ok(key.trim().to_string());
-    }
-
-    Err(anyhow!("No Claude API key found. Please configure one first."))
+    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
+        .map_err(|e| anyhow!("Failed to create keyring entry: {}", e))?;
+    entry
+        .get_password()
+        .map_err(|e| anyhow!("Failed to retrieve API key from keyring: {}", e))
 }
 
-/// Delete Claude API key from both keyring and fallback
+/// Delete Claude API key from the OS keychain
 pub fn delete_api_key() -> Result<()> {
-    // Try to delete from keyring
-    let _ = (|| -> Result<()> {
-        let entry = keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)?;
-        entry.delete_credential()?;
-        Ok(())
-    })();
-
-    // Try to delete fallback file
-    if let Ok(fallback_path) = get_api_key_fallback_path() {
-        let _ = fs::remove_file(fallback_path);
+    if let Ok(entry) = keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT) {
+        let _ = entry.delete_credential();
     }
-
     Ok(())
 }
 
@@ -313,8 +257,13 @@ pub async fn summarize_with_llm(
     log::debug!("Claude API response: {}", response_text);
 
     // Parse JSON response
-    let extraction: ExtractionResult = serde_json::from_str(&response_text)
-        .map_err(|e| anyhow!("Failed to parse Claude API JSON response: {}\nResponse: {}", e, response_text))?;
+    let extraction: ExtractionResult = serde_json::from_str(&response_text).map_err(|e| {
+        anyhow!(
+            "Failed to parse Claude API JSON response: {}\nResponse: {}",
+            e,
+            response_text
+        )
+    })?;
 
     log::info!(
         "LLM extracted {} features, {} decisions, {} questions",

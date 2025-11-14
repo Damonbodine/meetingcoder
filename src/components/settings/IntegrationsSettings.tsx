@@ -11,8 +11,30 @@ import { useSettings } from "../../hooks/useSettings";
 export const IntegrationsSettings: React.FC = () => {
   const { getSetting } = useSettings();
   const githubEnabled = getSetting("github_enabled") ?? false;
+  const advancedEnabled = getSetting("advanced_features_enabled") ?? false;
+  const offlineMode = getSetting("offline_mode_enabled") ?? false;
   const [showManualToken, setShowManualToken] = useState(false);
   const [showManualRepo, setShowManualRepo] = useState(false);
+
+  if (!advancedEnabled) {
+    return (
+      <div className="max-w-3xl w-full mx-auto">
+        <div className="rounded-md border border-border p-4 text-sm text-muted-foreground">
+          Integrations stay hidden in Recorder mode. Enable Advanced Automations under General → Modes to configure GitHub access, Claude, or IDE launchers.
+        </div>
+      </div>
+    );
+  }
+
+  if (offlineMode) {
+    return (
+      <div className="max-w-3xl w-full mx-auto">
+        <div className="rounded-md border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-200">
+          Offline mode is enabled. Disable it in General → Modes to authenticate with GitHub or run integrations that require a network connection.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl w-full mx-auto space-y-6">
@@ -88,4 +110,3 @@ export const IntegrationsSettings: React.FC = () => {
     </div>
   );
 };
-

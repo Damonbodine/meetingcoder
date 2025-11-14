@@ -28,8 +28,8 @@ pub struct Feature {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SummarizationOutput {
-    pub timestamp: String,              // RFC3339
-    pub segment_range: (usize, usize),  // inclusive range in full transcript
+    pub timestamp: String,             // RFC3339
+    pub segment_range: (usize, usize), // inclusive range in full transcript
 
     // Back-compat flat lists
     pub new_features: Vec<String>,
@@ -96,12 +96,17 @@ fn load_seen_feature_ids(project_path: Option<&str>, max_lines: usize) -> HashSe
     let Some(path) = project_path.map(|p| Path::new(p).join(".meeting-updates.jsonl")) else {
         return seen;
     };
-    let Ok(file) = File::open(path) else { return seen; };
+    let Ok(file) = File::open(path) else {
+        return seen;
+    };
     let reader = BufReader::new(file);
     // Keep only last max_lines using a ring buffer of strings
-    let mut buf: std::collections::VecDeque<String> = std::collections::VecDeque::with_capacity(max_lines);
+    let mut buf: std::collections::VecDeque<String> =
+        std::collections::VecDeque::with_capacity(max_lines);
     for line in reader.lines().flatten() {
-        if buf.len() == max_lines { buf.pop_front(); }
+        if buf.len() == max_lines {
+            buf.pop_front();
+        }
         buf.push_back(line);
     }
     for line in buf {
@@ -137,7 +142,9 @@ fn process_sentence(
     seen: &mut HashSet<String>,
 ) {
     let s = sentence.trim();
-    if s.is_empty() { return; }
+    if s.is_empty() {
+        return;
+    }
 
     if s.ends_with('?') {
         questions.push(s.to_string());
@@ -193,7 +200,7 @@ pub fn summarize_segments_with_context(
         let mut sentence = String::new();
         for ch in seg.text.chars() {
             sentence.push(ch);
-            if ch == '.' || ch == '!' || ch == '?' {                
+            if ch == '.' || ch == '!' || ch == '?' {
                 process_sentence(
                     &sentence,
                     &seg.speaker,
@@ -230,6 +237,6 @@ pub fn summarize_segments_with_context(
         new_features_structured,
         modified_features: None,
         clarifications: None,
-        target_files: Vec::new(),  // Will be populated by LLM or file extraction logic
+        target_files: Vec::new(), // Will be populated by LLM or file extraction logic
     }
 }

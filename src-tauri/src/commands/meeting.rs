@@ -1,5 +1,5 @@
 use crate::managers::meeting::{MeetingManager, MeetingStatus, MeetingSummary, TranscriptSegment};
-use crate::storage::transcript::{TranscriptStorage, TranscriptMetadata};
+use crate::storage::transcript::{TranscriptMetadata, TranscriptStorage};
 use chrono::{DateTime, Local, TimeZone};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -109,7 +109,11 @@ pub async fn get_meeting_info(
         MeetingStatus::Paused => "paused",
         MeetingStatus::Completed => "completed",
     };
-    Ok(MeetingInfo { id: m.id, name: m.name, status: status.to_string() })
+    Ok(MeetingInfo {
+        id: m.id,
+        name: m.name,
+        status: status.to_string(),
+    })
 }
 
 #[tauri::command]
@@ -128,14 +132,18 @@ pub async fn get_meeting_project_path(
 #[tauri::command]
 pub fn get_transcript_dir_for(meeting_name: String, start_time: i64) -> Result<String, String> {
     // Determine if the timestamp is in ms or s
-    let secs = if start_time > 1_000_000_000_000 { // > ~2001-09-09 in ms
+    let secs = if start_time > 1_000_000_000_000 {
+        // > ~2001-09-09 in ms
         start_time / 1000
     } else {
         start_time
     };
 
     // Format date like TranscriptStorage (local time)
-    let dt: DateTime<Local> = Local.timestamp_opt(secs, 0).single().ok_or_else(|| "Invalid timestamp".to_string())?;
+    let dt: DateTime<Local> = Local
+        .timestamp_opt(secs, 0)
+        .single()
+        .ok_or_else(|| "Invalid timestamp".to_string())?;
     let date_str = dt.format("%Y-%m-%d").to_string();
 
     // Sanitize like TranscriptStorage::generate_meeting_dir_name
@@ -144,8 +152,12 @@ pub fn get_transcript_dir_for(meeting_name: String, start_time: i64) -> Result<S
         .filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-' || *c == '_')
         .collect();
     sanitized = sanitized.replace(' ', "-").to_lowercase();
-    if sanitized.is_empty() { sanitized = "untitled".to_string(); }
-    if sanitized.len() > 100 { sanitized.truncate(100); }
+    if sanitized.is_empty() {
+        sanitized = "untitled".to_string();
+    }
+    if sanitized.len() > 100 {
+        sanitized.truncate(100);
+    }
     sanitized = sanitized.replace("..", "");
 
     let dir_name = format!("{}_{}", date_str, sanitized);
@@ -219,5 +231,7 @@ pub fn open_meeting_folder(dir_path: String) -> Result<(), String> {
 #[tauri::command]
 pub fn delete_saved_meeting(dir_name: String) -> Result<(), String> {
     let storage = TranscriptStorage::with_default_path().map_err(|e| e.to_string())?;
-    storage.delete_transcript(&dir_name).map_err(|e| e.to_string())
+    storage
+        .delete_transcript(&dir_name)
+        .map_err(|e| e.to_string())
 }

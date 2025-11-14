@@ -14,21 +14,47 @@ import { UpdateInterval } from "./UpdateInterval";
 import { AutoTriggerToggle } from "./AutoTriggerToggle";
 import { AutoAcceptChanges } from "./AutoAcceptChanges";
 import { AutomationDebounce } from "./AutomationDebounce";
+import { AdvancedPersonaToggle } from "./AdvancedPersonaToggle";
+import { OfflineModeToggle } from "./OfflineModeToggle";
 
 export const GeneralSettings: React.FC = () => {
-  const { audioFeedbackEnabled } = useSettings();
+  const { audioFeedbackEnabled, getSetting } = useSettings();
+  const advancedEnabled = getSetting("advanced_features_enabled") ?? false;
+  const offlineMode = getSetting("offline_mode_enabled") ?? false;
+  const automationsDisabled = !advancedEnabled || offlineMode;
 
   return (
     <div className="max-w-3xl w-full mx-auto space-y-6">
+      <SettingsGroup title="Modes">
+        <AdvancedPersonaToggle descriptionMode="inline" grouped={true} />
+        <OfflineModeToggle descriptionMode="inline" grouped={true} />
+      </SettingsGroup>
       <SettingsGroup title="General">
         <AppShortcut descriptionMode="tooltip" grouped={true} />
         <LanguageSelector descriptionMode="tooltip" grouped={true} />
         <PushToTalk descriptionMode="tooltip" grouped={true} />
         <ChunkDuration descriptionMode="tooltip" grouped={true} />
         <UpdateInterval descriptionMode="tooltip" grouped={true} />
-        <AutoTriggerToggle descriptionMode="tooltip" grouped={true} />
-        <AutomationDebounce descriptionMode="tooltip" grouped={true} />
-        <AutoAcceptChanges descriptionMode="tooltip" grouped={true} />
+        <AutoTriggerToggle
+          descriptionMode="tooltip"
+          grouped={true}
+          disabled={automationsDisabled}
+        />
+        <AutomationDebounce
+          descriptionMode="tooltip"
+          grouped={true}
+          disabled={automationsDisabled}
+        />
+        <AutoAcceptChanges
+          descriptionMode="tooltip"
+          grouped={true}
+          disabled={automationsDisabled}
+        />
+        {automationsDisabled && (
+          <p className="px-4 text-xs text-muted-foreground">
+            Automation controls are disabled in Recorder/offline mode. Enable Advanced mode and go online to control Claude or GitHub workflows.
+          </p>
+        )}
       </SettingsGroup>
       <SettingsGroup title="Sound">
         <AudioSourceSelector descriptionMode="tooltip" grouped={true} />

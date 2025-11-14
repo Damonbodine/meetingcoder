@@ -22,7 +22,7 @@ Scope: Offline import of local audio and YouTube into MeetingCoder sessions
 - Meetings → "Import Audio into MeetingCoder"
 - Enter name (e.g., "Brijay")
 - Browse… and select one of:
-  - Preferred sample for repro: `/Users/damonbodine/speechtotext/Handy/audio1466401210.m4a`
+  - Preferred sample for repro: download `audio1466401210.m4a` from the MeetingCoder Releases page (stored outside the repo) and point the picker at that file
   - Or your Zoom file path if testing your own meeting
 - Click Import
 
@@ -130,7 +130,7 @@ Needed (optional)
 
 ## Acceptance Checks
 
-- Decode duration ~ 35 min (mono_samples ≈ 33.6M). For sample file at `/Users/damonbodine/speechtotext/Handy/audio1466401210.m4a`, confirm logs show `Import decode: mono_samples=..., approx_minutes=...` and either `Decoded with symphonia` or `Decoded with rodio` with expected sample magnitude.
+- Decode duration ~ 35 min (mono_samples ≈ 33.6M). For the release sample `audio1466401210.m4a`, confirm logs show `Import decode: mono_samples=..., approx_minutes=...` and either `Decoded with symphonia` or `Decoded with rodio` with expected sample magnitude.
 - Segments cover almost full duration (last end ≥ total_seconds - 1)
 - Subjective review: boundary words preserved; summary.md reflects correct themes
 - UI buttons open the folder/transcripts successfully

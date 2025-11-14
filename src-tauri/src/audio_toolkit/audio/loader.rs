@@ -54,7 +54,11 @@ pub fn load_audio_file_to_mono_16k<P: AsRef<Path>>(path: P) -> Result<Vec<f32>> 
                         e
                     ));
                 }
-                log::warn!("Alternate decoder also errored for {}: {}", path_ref.display(), e);
+                log::warn!(
+                    "Alternate decoder also errored for {}: {}",
+                    path_ref.display(),
+                    e
+                );
                 Vec::new()
             }
         };
@@ -81,20 +85,30 @@ pub fn load_audio_file_to_mono_16k<P: AsRef<Path>>(path: P) -> Result<Vec<f32>> 
 }
 
 fn decode_with_rodio(path_ref: &Path) -> Result<Vec<f32>> {
-    let file = File::open(path_ref).map_err(|e| anyhow!("Failed to open file {}: {}", path_ref.display(), e))?;
+    let file = File::open(path_ref)
+        .map_err(|e| anyhow!("Failed to open file {}: {}", path_ref.display(), e))?;
     let reader = BufReader::new(file);
     let decoder = rodio::Decoder::new(reader)
         .map_err(|e| anyhow!("Failed to decode audio {}: {}", path_ref.display(), e))?;
     let in_rate = decoder.sample_rate() as usize;
     let channels = decoder.channels() as usize;
-    if channels == 0 { return Err(anyhow!("Audio file has 0 channels: {}", path_ref.display())); }
+    if channels == 0 {
+        return Err(anyhow!("Audio file has 0 channels: {}", path_ref.display()));
+    }
     let mut interleaved: Vec<f32> = Vec::new();
     if let Some(dur) = decoder.total_duration() {
         let est_samples = (dur.as_secs_f64() * in_rate as f64 * channels as f64) as usize;
         interleaved.reserve(est_samples.min(100_000_000));
     }
-    for s in decoder { interleaved.push((s as f32) / (i16::MAX as f32)); if interleaved.len() > 300_000_000 { break; } }
-    if interleaved.is_empty() { return Err(anyhow!("Decoded zero samples from {}", path_ref.display())); }
+    for s in decoder {
+        interleaved.push((s as f32) / (i16::MAX as f32));
+        if interleaved.len() > 300_000_000 {
+            break;
+        }
+    }
+    if interleaved.is_empty() {
+        return Err(anyhow!("Decoded zero samples from {}", path_ref.display()));
+    }
     log::info!(
         "Decoded with rodio: path={}, channels={}, in_rate={} Hz, interleaved_samples={}",
         path_ref.display(),
@@ -105,7 +119,10 @@ fn decode_with_rodio(path_ref: &Path) -> Result<Vec<f32>> {
     let frames = interleaved.len() / channels;
     let mut mono: Vec<f32> = Vec::with_capacity(frames);
     for i in 0..frames {
-        let mut acc = 0.0f32; for c in 0..channels { acc += interleaved[i * channels + c]; }
+        let mut acc = 0.0f32;
+        for c in 0..channels {
+            acc += interleaved[i * channels + c];
+        }
         mono.push(acc / channels as f32);
     }
     let out = resample_to_16k(in_rate, &mono)?;
@@ -119,9 +136,12 @@ fn decode_with_rodio(path_ref: &Path) -> Result<Vec<f32>> {
 }
 
 fn resample_to_16k(in_rate: usize, mono: &[f32]) -> Result<Vec<f32>> {
-    if in_rate == 16_000 { return Ok(mono.to_vec()); }
+    if in_rate == 16_000 {
+        return Ok(mono.to_vec());
+    }
     let mut resampler = FrameResampler::new(in_rate, 16_000, std::time::Duration::from_millis(30));
-    let mut out: Vec<f32> = Vec::with_capacity((mono.len() as f64 * 16_000f64 / in_rate as f64).ceil() as usize + 1024);
+    let mut out: Vec<f32> =
+        Vec::with_capacity((mono.len() as f64 * 16_000f64 / in_rate as f64).ceil() as usize + 1024);
     resampler.push(mono, |frame| out.extend_from_slice(frame));
     resampler.finish(|frame| out.extend_from_slice(frame));
     Ok(out)
@@ -140,10 +160,17 @@ fn decode_with_symphonia(path_ref: &Path) -> Result<Vec<f32>> {
         .map_err(|e| anyhow!("Failed to open file {}: {}", path_ref.display(), e))?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
     let mut hint = Hint::new();
-    if let Some(ext) = path_ref.extension().and_then(|e| e.to_str()) { hint.with_extension(ext); }
+    if let Some(ext) = path_ref.extension().and_then(|e| e.to_str()) {
+        hint.with_extension(ext);
+    }
 
     let probed = symphonia::default::get_probe()
-        .format(&hint, mss, &FormatOptions::default(), &MetadataOptions::default())
+        .format(
+            &hint,
+            mss,
+            &FormatOptions::default(),
+            &MetadataOptions::default(),
+        )
         .map_err(|e| anyhow!("Symphonia probe failed: {}", e))?;
     let mut format = probed.format;
 
@@ -157,11 +184,7 @@ fn decode_with_symphonia(path_ref: &Path) -> Result<Vec<f32>> {
         .sample_rate
         .ok_or_else(|| anyhow!("Unknown sample rate"))? as usize;
     // Some Zoom M4A files report unknown channel layout. Default to 2 channels instead of failing.
-    let channels = track
-        .codec_params
-        .channels
-        .map(|c| c.count())
-        .unwrap_or(2);
+    let channels = track.codec_params.channels.map(|c| c.count()).unwrap_or(2);
 
     log::info!(
         "Symphonia probe: path={}, codec={:?}, channels={}, in_rate={} Hz",
@@ -180,9 +203,18 @@ fn decode_with_symphonia(path_ref: &Path) -> Result<Vec<f32>> {
     loop {
         let packet = match format.next_packet() {
             Ok(p) => p,
-            Err(SymphoniaError::ResetRequired) => { decoder.reset(); continue; }
-            Err(SymphoniaError::IoError(err)) if err.kind() == std::io::ErrorKind::UnexpectedEof => break,
-            Err(SymphoniaError::IoError(err)) if err.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(SymphoniaError::ResetRequired) => {
+                decoder.reset();
+                continue;
+            }
+            Err(SymphoniaError::IoError(err))
+                if err.kind() == std::io::ErrorKind::UnexpectedEof =>
+            {
+                break
+            }
+            Err(SymphoniaError::IoError(err)) if err.kind() == std::io::ErrorKind::Interrupted => {
+                continue
+            }
             Err(SymphoniaError::DecodeError(_)) => continue,
             Err(e) => return Err(anyhow!("Symphonia read error: {}", e)),
         };
@@ -196,7 +228,9 @@ fn decode_with_symphonia(path_ref: &Path) -> Result<Vec<f32>> {
                 } else {
                     for i in 0..buf.frames() {
                         let mut acc = 0.0f32;
-                        for c in 0..ch { acc += buf.chan(c)[i]; }
+                        for c in 0..ch {
+                            acc += buf.chan(c)[i];
+                        }
                         mono.push(acc / ch as f32);
                     }
                 }
@@ -208,7 +242,9 @@ fn decode_with_symphonia(path_ref: &Path) -> Result<Vec<f32>> {
                 } else {
                     for i in 0..buf.frames() {
                         let mut acc = 0.0f32;
-                        for c in 0..ch { acc += (buf.chan(c)[i] as f32) / (i16::MAX as f32); }
+                        for c in 0..ch {
+                            acc += (buf.chan(c)[i] as f32) / (i16::MAX as f32);
+                        }
                         mono.push(acc / ch as f32);
                     }
                 }
@@ -221,7 +257,9 @@ fn decode_with_symphonia(path_ref: &Path) -> Result<Vec<f32>> {
                 } else {
                     for i in 0..buf.frames() {
                         let mut acc = 0.0f32;
-                        for c in 0..ch { acc += to_f32(buf.chan(c)[i]); }
+                        for c in 0..ch {
+                            acc += to_f32(buf.chan(c)[i]);
+                        }
                         mono.push(acc / ch as f32);
                     }
                 }
@@ -238,7 +276,9 @@ fn decode_with_symphonia(path_ref: &Path) -> Result<Vec<f32>> {
                 } else {
                     for i in 0..out_buf.frames() {
                         let mut acc = 0.0f32;
-                        for c in 0..ch { acc += out_buf.chan(c)[i]; }
+                        for c in 0..ch {
+                            acc += out_buf.chan(c)[i];
+                        }
                         mono.push(acc / ch as f32);
                     }
                 }
@@ -247,10 +287,14 @@ fn decode_with_symphonia(path_ref: &Path) -> Result<Vec<f32>> {
             Err(e) => return Err(anyhow!("Symphonia decode error: {}", e)),
         }
 
-        if mono.len() > 100_000_000 { break; }
+        if mono.len() > 100_000_000 {
+            break;
+        }
     }
 
-    if mono.is_empty() { return Err(anyhow!("Decoded zero samples from {}", path_ref.display())); }
+    if mono.is_empty() {
+        return Err(anyhow!("Decoded zero samples from {}", path_ref.display()));
+    }
     let out = resample_to_16k(sample_rate, &mono)?;
     log::info!(
         "Symphonia resample: in_rate={} -> out_rate=16000 Hz, mono_in_samples={}, mono_out_samples={}",

@@ -114,7 +114,11 @@ pub trait SystemAudioCaptureDevice {
 
 /// Helper function to detect if system audio capture is available on this platform
 pub fn is_system_audio_available() -> bool {
-    cfg!(any(target_os = "macos", target_os = "windows", target_os = "linux"))
+    cfg!(any(
+        target_os = "macos",
+        target_os = "windows",
+        target_os = "linux"
+    ))
 }
 
 /// Get platform-specific setup instructions for virtual audio devices

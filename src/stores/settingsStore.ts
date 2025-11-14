@@ -51,6 +51,8 @@ const DEFAULT_SETTINGS: Partial<Settings> = {
   selected_language: "auto",
   overlay_position: "bottom",
   debug_mode: false,
+  advanced_features_enabled: false,
+  offline_mode_enabled: false,
   custom_words: [],
   history_limit: 5,
   mute_while_recording: false,
@@ -112,6 +114,10 @@ const settingUpdaters: {
     invoke("change_overlay_position_setting", { position: value }),
   debug_mode: (value) =>
     invoke("change_debug_mode_setting", { enabled: value }),
+  advanced_features_enabled: (value) =>
+    invoke("change_advanced_features_setting", { enabled: value }),
+  offline_mode_enabled: (value) =>
+    invoke("change_offline_mode_setting", { enabled: value }),
   custom_words: (value) => invoke("update_custom_words", { words: value }),
   word_correction_threshold: (value) =>
     invoke("change_word_correction_threshold_setting", { threshold: value }),

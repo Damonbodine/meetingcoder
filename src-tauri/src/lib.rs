@@ -1,25 +1,25 @@
 mod actions;
 mod audio_feedback;
 pub mod audio_toolkit;
+mod automation;
 mod clipboard;
+mod codebase;
 mod commands;
+mod document_generation;
+mod integrations;
 mod managers;
+mod meeting;
 mod overlay;
+mod project;
+mod queue;
 mod settings;
 mod shortcut;
 mod storage;
-mod project;
-mod meeting;
 mod summarization;
 mod system_audio;
 mod tray;
 mod utils;
-mod automation;
-mod integrations;
-mod codebase;
-mod queue;
 mod workers;
-mod document_generation;
 
 use managers::audio::AudioRecordingManager;
 use managers::history::HistoryManager;
@@ -79,16 +79,27 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     let history_manager =
         Arc::new(HistoryManager::new(app_handle).expect("Failed to initialize history manager"));
     let meeting_manager = Arc::new(
-        MeetingManager::new(app_handle, recording_manager.clone(), transcription_manager.clone())
-            .expect("Failed to initialize meeting manager"),
+        MeetingManager::new(
+            app_handle,
+            recording_manager.clone(),
+            transcription_manager.clone(),
+        )
+        .expect("Failed to initialize meeting manager"),
     );
 
     // Initialize durable audio queue and ASR worker(s)
     let queue = queue::Queue::new(app_handle).expect("Failed to initialize audio queue");
     app_handle.manage(queue.clone());
-    let worker_count = settings::get_settings(app_handle).queue_worker_count.clamp(1, 8);
+    let worker_count = settings::get_settings(app_handle)
+        .queue_worker_count
+        .clamp(1, 8);
     for _ in 0..worker_count {
-        workers::asr_worker::spawn(queue.clone(), meeting_manager.clone(), transcription_manager.clone(), app_handle.clone());
+        workers::asr_worker::spawn(
+            queue.clone(),
+            meeting_manager.clone(),
+            transcription_manager.clone(),
+            app_handle.clone(),
+        );
     }
 
     // Add managers to Tauri's managed state
@@ -257,6 +268,8 @@ pub fn run() {
             shortcut::change_selected_language_setting,
             shortcut::change_overlay_position_setting,
             shortcut::change_debug_mode_setting,
+            shortcut::change_advanced_features_setting,
+            shortcut::change_offline_mode_setting,
             shortcut::change_word_correction_threshold_setting,
             shortcut::change_paste_method_setting,
             shortcut::change_clipboard_handling_setting,
@@ -313,6 +326,7 @@ pub fn run() {
             commands::audio::clear_system_audio_buffer,
             commands::audio::get_audio_metrics,
             commands::audio::get_audio_errors,
+            commands::audio::get_background_music_status,
             commands::transcription::set_model_unload_timeout,
             commands::transcription::get_model_load_status,
             commands::transcription::unload_model_manually,
@@ -337,6 +351,7 @@ pub fn run() {
             commands::import::import_audio_as_meeting,
             commands::import::import_youtube_as_meeting,
             commands::import::pick_audio_file,
+            commands::import::get_import_tool_status,
             commands::get_app_dir_path,
             commands::open_path_in_file_manager,
             commands::automation::trigger_meeting_command_now,

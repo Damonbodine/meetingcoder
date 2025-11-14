@@ -6,7 +6,7 @@
 use super::{AudioChunkCallback, SystemAudioCaptureDevice, VirtualDeviceInfo};
 use anyhow::{Context, Result};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, Host, Stream, SampleFormat};
+use cpal::{Device, Host, SampleFormat, Stream};
 use log::{debug, info, warn};
 use std::sync::{Arc, Mutex};
 
@@ -310,7 +310,9 @@ mod tests {
     fn test_is_virtual_device() {
         assert!(MacOSSystemAudio::is_virtual_device("BlackHole 2ch"));
         assert!(MacOSSystemAudio::is_virtual_device("Loopback Audio"));
-        assert!(!MacOSSystemAudio::is_virtual_device("MacBook Pro Microphone"));
+        assert!(!MacOSSystemAudio::is_virtual_device(
+            "MacBook Pro Microphone"
+        ));
     }
 
     #[test]

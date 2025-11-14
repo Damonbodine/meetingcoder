@@ -30,6 +30,15 @@ The process is entirely local:
   - **Parakeet V3** - CPU-optimized model with excellent performance and automatic language detection
 - Works on Windows, macOS, and Linux
 
+## Modes & Privacy Guardrails
+
+MeetingCoder now ships with two first-class personas so casual users don't have to worry about automation surprises:
+
+- **Recorder Mode (default):** Focuses on live transcription, local audio imports, and summaries. GitHub automation, `/meeting` triggers, and IDE launchers stay hidden.
+- **Advanced Automations:** Flip the toggle in *Settings → General → Modes* to unlock GitHub pushes, Claude-powered summaries, and other scripted workflows. Every action is gated with confirmations and status indicators.
+
+You can also enable **Offline Mode** in the same section. While offline we block all network calls—Claude, GitHub, and YouTube import are paused until you opt back in—so regulated environments can keep data air-gapped.
+
 ## Quick Start
 
 ### Installation
@@ -47,8 +56,24 @@ For detailed build instructions including platform-specific requirements, see [B
 ### Import Audio/YouTube into MeetingCoder
 
 - Import a local file: Open Meetings → "Import Audio into MeetingCoder", enter a meeting name, and choose an audio file (wav/mp3/m4a/ogg/flac).
-- Import a YouTube URL: Paste the URL and click Import. Requires `yt-dlp` on PATH (macOS: `brew install yt-dlp`).
+- Import a YouTube URL: Paste the URL and click Import. MeetingCoder now runs a pre-flight check to confirm both `yt-dlp` and `ffmpeg` are available before enabling the button.
 - The app creates a transcript and appends `.meeting-updates.jsonl`; automation can run if enabled.
+- Need a sample clip? Download `audio1466401210.m4a` from the repository Releases page—the large file is no longer checked into git.
+
+## External Dependencies
+
+Most of MeetingCoder works completely offline, but two optional helpers make imports reliable:
+
+- **ffmpeg** – used to normalize imported recordings.
+  - macOS: `brew install ffmpeg`
+  - Windows: `winget install Gyan.FFmpeg`
+  - Ubuntu/Debian: `sudo apt install ffmpeg`
+- **yt-dlp** – required only for YouTube imports.
+  - macOS: `brew install yt-dlp`
+  - Windows: `winget install yt-dlp.yt-dlp`
+  - Linux: `pipx install yt-dlp`
+
+The Transcription view shows the current status of these tools and offers a one-click re-check so the UI stays in sync with your PATH.
 
 ## Architecture
 

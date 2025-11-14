@@ -25,7 +25,13 @@ impl ProjectInitializer {
 
     fn sanitize_name(name: &str) -> String {
         name.chars()
-            .map(|c| if c.is_alphanumeric() || c == '-' || c == ' ' { c } else { ' ' })
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' || c == ' ' {
+                    c
+                } else {
+                    ' '
+                }
+            })
             .collect::<String>()
             .split_whitespace()
             .collect::<Vec<_>>()
@@ -45,7 +51,10 @@ impl ProjectInitializer {
         // Seed .meeting-updates.jsonl
         let updates_path = project_dir.join(".meeting-updates.jsonl");
         if !updates_path.exists() {
-            OpenOptions::new().create(true).write(true).open(&updates_path)?;
+            OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(&updates_path)?;
         }
 
         // Seed .claude/.meeting-state.json
@@ -59,7 +68,9 @@ impl ProjectInitializer {
         }
 
         // Copy command template to .claude/commands/meeting.md (dev fallback)
-        let dev_template_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("templates").join("meeting_command.md");
+        let dev_template_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("templates")
+            .join("meeting_command.md");
         if dev_template_path.exists() {
             let content = fs::read_to_string(&dev_template_path)?;
             fs::write(commands_dir.join("meeting.md"), content)?;
@@ -105,7 +116,11 @@ impl ProjectInitializer {
     }
 
     /// Same as init_for_meeting, but attempts to load the template from bundled resources.
-    pub fn init_for_meeting_with_app(&self, meeting_name: &str, app: &tauri::AppHandle) -> Result<String> {
+    pub fn init_for_meeting_with_app(
+        &self,
+        meeting_name: &str,
+        app: &tauri::AppHandle,
+    ) -> Result<String> {
         let path = self.init_for_meeting(meeting_name)?;
 
         let project_dir = PathBuf::from(&path);
@@ -113,23 +128,22 @@ impl ProjectInitializer {
         let commands_dir = claude_dir.join("commands");
 
         // Try to resolve bundled resource first
-        let resource_path = app
-            .path()
-            .resolve("templates/meeting_command.md", tauri::path::BaseDirectory::Resource);
+        let resource_path = app.path().resolve(
+            "templates/meeting_command.md",
+            tauri::path::BaseDirectory::Resource,
+        );
 
         match resource_path {
-            Ok(p) => {
-                match fs::read_to_string(&p) {
-                    Ok(content) => {
-                        if let Err(e) = fs::write(commands_dir.join("meeting.md"), content) {
-                            log::warn!("Failed writing meeting.md from resource: {}", e);
-                        }
-                    }
-                    Err(e) => {
-                        log::warn!("Failed reading template resource {}: {}", p.display(), e);
+            Ok(p) => match fs::read_to_string(&p) {
+                Ok(content) => {
+                    if let Err(e) = fs::write(commands_dir.join("meeting.md"), content) {
+                        log::warn!("Failed writing meeting.md from resource: {}", e);
                     }
                 }
-            }
+                Err(e) => {
+                    log::warn!("Failed reading template resource {}: {}", p.display(), e);
+                }
+            },
             Err(e) => {
                 log::warn!("Failed to resolve template resource: {}", e);
             }
@@ -142,7 +156,10 @@ impl ProjectInitializer {
     /// Creates `.transcript.jsonl`, `.claude/commands/meeting.md`, and `.claude/.meeting-state.json`
     pub fn seed_in_existing_dir_with_app(dir: &PathBuf, app: &tauri::AppHandle) -> Result<()> {
         if !dir.exists() {
-            return Err(anyhow::anyhow!("Target directory does not exist: {}", dir.display()));
+            return Err(anyhow::anyhow!(
+                "Target directory does not exist: {}",
+                dir.display()
+            ));
         }
 
         let claude_dir = dir.join(".claude");
@@ -152,7 +169,10 @@ impl ProjectInitializer {
         // Seed transcript jsonl (append-only)
         let updates_path = dir.join(".transcript.jsonl");
         if !updates_path.exists() {
-            OpenOptions::new().create(true).write(true).open(&updates_path)?;
+            OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(&updates_path)?;
         }
 
         // Seed .claude/.meeting-state.json if missing
@@ -166,9 +186,10 @@ impl ProjectInitializer {
         }
 
         // Try to resolve bundled command template first, else dev template fallback
-        let resource_path = app
-            .path()
-            .resolve("templates/meeting_command.md", tauri::path::BaseDirectory::Resource);
+        let resource_path = app.path().resolve(
+            "templates/meeting_command.md",
+            tauri::path::BaseDirectory::Resource,
+        );
         match resource_path {
             Ok(p) => {
                 if let Ok(content) = std::fs::read_to_string(&p) {
@@ -176,7 +197,9 @@ impl ProjectInitializer {
                 }
             }
             Err(_) => {
-                let dev_template_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("templates").join("meeting_command.md");
+                let dev_template_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("templates")
+                    .join("meeting_command.md");
                 if dev_template_path.exists() {
                     if let Ok(content) = std::fs::read_to_string(&dev_template_path) {
                         let _ = std::fs::write(commands_dir.join("meeting.md"), content);

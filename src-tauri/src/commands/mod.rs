@@ -1,15 +1,15 @@
 pub mod audio;
-pub mod history;
-pub mod meeting;
-pub mod models;
-pub mod system_audio;
-pub mod transcription;
 pub mod automation;
+pub mod codebase;
 pub mod github;
+pub mod history;
 pub mod import;
 pub mod llm;
-pub mod codebase;
+pub mod meeting;
+pub mod models;
 pub mod prd;
+pub mod system_audio;
+pub mod transcription;
 
 use crate::utils::cancel_current_operation;
 use tauri::{AppHandle, Manager};
@@ -32,8 +32,7 @@ pub fn get_app_dir_path(app: AppHandle) -> Result<String, String> {
 
 #[tauri::command]
 pub fn open_path_in_file_manager(app: AppHandle, path: String) -> Result<(), String> {
-    app
-        .opener()
+    app.opener()
         .open_path(path, None::<&str>)
         .map_err(|e| e.to_string())
 }

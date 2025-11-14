@@ -10,7 +10,10 @@ pub async fn generate_prd_now(
     _app: AppHandle,
     meeting_manager: State<'_, Arc<MeetingManager>>,
 ) -> Result<PRDVersion, String> {
-    log::info!("Manual PRD generation requested for meeting: {}", meeting_id);
+    log::info!(
+        "Manual PRD generation requested for meeting: {}",
+        meeting_id
+    );
 
     // Get meeting data
     let meeting_session = meeting_manager
@@ -87,8 +90,8 @@ pub async fn get_prd_change(
     from_version: u32,
     to_version: u32,
 ) -> Result<PRDChange, String> {
-    let changelog = load_changelog(&meeting_id)
-        .map_err(|e| format!("Failed to load changelog: {}", e))?;
+    let changelog =
+        load_changelog(&meeting_id).map_err(|e| format!("Failed to load changelog: {}", e))?;
 
     changelog
         .changes

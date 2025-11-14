@@ -13,7 +13,10 @@ pub fn analyze_changes(previous: &PRDContent, current: &PRDContent) -> PRDChange
             &previous.user_stories.iter().map(|s| s.id.clone()).collect(),
             &current.user_stories.iter().map(|s| s.id.clone()).collect(),
         ),
-        modified_user_stories: find_modified_user_stories(&previous.user_stories, &current.user_stories),
+        modified_user_stories: find_modified_user_stories(
+            &previous.user_stories,
+            &current.user_stories,
+        ),
         removed_user_stories: find_removed_items(
             &previous.user_stories.iter().map(|s| s.id.clone()).collect(),
             &current.user_stories.iter().map(|s| s.id.clone()).collect(),
@@ -27,14 +30,33 @@ pub fn analyze_changes(previous: &PRDContent, current: &PRDContent) -> PRDChange
             &get_all_requirement_ids(previous),
             &get_all_requirement_ids(current),
         ),
-        resolved_questions: find_resolved_questions(&previous.open_questions, &current.open_questions),
+        resolved_questions: find_resolved_questions(
+            &previous.open_questions,
+            &current.open_questions,
+        ),
         new_questions: find_added_items(
-            &previous.open_questions.iter().map(|q| q.id.clone()).collect(),
-            &current.open_questions.iter().map(|q| q.id.clone()).collect(),
+            &previous
+                .open_questions
+                .iter()
+                .map(|q| q.id.clone())
+                .collect(),
+            &current
+                .open_questions
+                .iter()
+                .map(|q| q.id.clone())
+                .collect(),
         ),
         added_technical_requirements: find_added_items(
-            &previous.technical_requirements.iter().map(|t| t.id.clone()).collect(),
-            &current.technical_requirements.iter().map(|t| t.id.clone()).collect(),
+            &previous
+                .technical_requirements
+                .iter()
+                .map(|t| t.id.clone())
+                .collect(),
+            &current
+                .technical_requirements
+                .iter()
+                .map(|t| t.id.clone())
+                .collect(),
         ),
         added_risks: find_added_items(
             &previous.risks.iter().map(|r| r.id.clone()).collect(),
@@ -48,17 +70,14 @@ pub fn analyze_changes(previous: &PRDContent, current: &PRDContent) -> PRDChange
 }
 
 fn find_added_items(previous_ids: &HashSet<String>, current_ids: &HashSet<String>) -> Vec<String> {
-    current_ids
-        .difference(previous_ids)
-        .cloned()
-        .collect()
+    current_ids.difference(previous_ids).cloned().collect()
 }
 
-fn find_removed_items(previous_ids: &HashSet<String>, current_ids: &HashSet<String>) -> Vec<String> {
-    previous_ids
-        .difference(current_ids)
-        .cloned()
-        .collect()
+fn find_removed_items(
+    previous_ids: &HashSet<String>,
+    current_ids: &HashSet<String>,
+) -> Vec<String> {
+    previous_ids.difference(current_ids).cloned().collect()
 }
 
 fn find_modified_user_stories(previous: &[UserStory], current: &[UserStory]) -> Vec<String> {

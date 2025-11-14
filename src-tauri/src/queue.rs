@@ -55,9 +55,17 @@ impl Queue {
             .as_millis() as i64
     }
 
-    fn open(&self) -> Result<Connection> { Ok(Connection::open(&self.db_path)?) }
+    fn open(&self) -> Result<Connection> {
+        Ok(Connection::open(&self.db_path)?)
+    }
 
-    pub fn enqueue(&self, meeting_id: &str, start_ms: u64, end_ms: u64, file_path: &str) -> Result<i64> {
+    pub fn enqueue(
+        &self,
+        meeting_id: &str,
+        start_ms: u64,
+        end_ms: u64,
+        file_path: &str,
+    ) -> Result<i64> {
         let conn = self.open()?;
         let now = Self::now_ms();
         conn.execute(
@@ -116,8 +124,16 @@ impl Queue {
 
     pub fn counts(&self) -> Result<(i64, i64, i64)> {
         let conn = self.open()?;
-        let queued: i64 = conn.query_row("SELECT COUNT(*) FROM queue WHERE status='queued'", [], |r| r.get(0))?;
-        let processing: i64 = conn.query_row("SELECT COUNT(*) FROM queue WHERE status='processing'", [], |r| r.get(0))?;
+        let queued: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM queue WHERE status='queued'",
+            [],
+            |r| r.get(0),
+        )?;
+        let processing: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM queue WHERE status='processing'",
+            [],
+            |r| r.get(0),
+        )?;
         let failed: i64 = conn.query_row("SELECT COUNT(*) FROM queue WHERE status!='queued' AND status!='processing' AND status!='done'", [], |r| r.get(0)).unwrap_or(0);
         Ok((queued, processing, failed))
     }

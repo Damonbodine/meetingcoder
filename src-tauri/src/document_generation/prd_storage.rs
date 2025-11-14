@@ -51,8 +51,8 @@ pub fn save_prd_version(
 
     // Save version metadata
     let version_path = prd_dir.join(format!("{}_version.json", filename_base));
-    let version_str = serde_json::to_string_pretty(version)
-        .context("Failed to serialize version metadata")?;
+    let version_str =
+        serde_json::to_string_pretty(version).context("Failed to serialize version metadata")?;
     fs::write(&version_path, version_str)
         .with_context(|| format!("Failed to write version metadata to {:?}", version_path))?;
 
@@ -60,23 +60,27 @@ pub fn save_prd_version(
 }
 
 /// Load PRD version from disk
-pub fn load_prd_version(meeting_id: &str, version: u32) -> Result<(PRDVersion, PRDContent, String)> {
+pub fn load_prd_version(
+    meeting_id: &str,
+    version: u32,
+) -> Result<(PRDVersion, PRDContent, String)> {
     let prd_dir = get_prd_directory(meeting_id)?;
 
     // Find the version file
     let version_files = find_version_files(&prd_dir, version)?;
 
     // Load version metadata
-    let version_data: PRDVersion = serde_json::from_str(&fs::read_to_string(&version_files.version)?)
-        .context("Failed to parse version metadata")?;
+    let version_data: PRDVersion =
+        serde_json::from_str(&fs::read_to_string(&version_files.version)?)
+            .context("Failed to parse version metadata")?;
 
     // Load JSON content
     let content: PRDContent = serde_json::from_str(&fs::read_to_string(&version_files.json)?)
         .context("Failed to parse PRD content")?;
 
     // Load markdown
-    let markdown = fs::read_to_string(&version_files.markdown)
-        .context("Failed to read markdown file")?;
+    let markdown =
+        fs::read_to_string(&version_files.markdown).context("Failed to read markdown file")?;
 
     Ok((version_data, content, markdown))
 }
@@ -118,8 +122,8 @@ pub fn save_changelog(meeting_id: &str, changelog: &PRDChangelog) -> Result<()> 
     let prd_dir = get_prd_directory(meeting_id)?;
     let changelog_path = prd_dir.join("changelog.json");
 
-    let json_str = serde_json::to_string_pretty(changelog)
-        .context("Failed to serialize changelog")?;
+    let json_str =
+        serde_json::to_string_pretty(changelog).context("Failed to serialize changelog")?;
 
     fs::write(&changelog_path, json_str)
         .with_context(|| format!("Failed to write changelog to {:?}", changelog_path))?;
@@ -139,8 +143,8 @@ pub fn load_changelog(meeting_id: &str) -> Result<PRDChangelog> {
     let content = fs::read_to_string(&changelog_path)
         .with_context(|| format!("Failed to read changelog from {:?}", changelog_path))?;
 
-    let changelog: PRDChangelog = serde_json::from_str(&content)
-        .context("Failed to parse changelog JSON")?;
+    let changelog: PRDChangelog =
+        serde_json::from_str(&content).context("Failed to parse changelog JSON")?;
 
     Ok(changelog)
 }
@@ -150,8 +154,8 @@ pub fn save_metadata(meeting_id: &str, metadata: &PRDMetadata) -> Result<()> {
     let prd_dir = get_prd_directory(meeting_id)?;
     let metadata_path = prd_dir.join("metadata.json");
 
-    let json_str = serde_json::to_string_pretty(metadata)
-        .context("Failed to serialize metadata")?;
+    let json_str =
+        serde_json::to_string_pretty(metadata).context("Failed to serialize metadata")?;
 
     fs::write(&metadata_path, json_str)
         .with_context(|| format!("Failed to write metadata to {:?}", metadata_path))?;
@@ -171,8 +175,8 @@ pub fn load_metadata(meeting_id: &str) -> Result<Option<PRDMetadata>> {
     let content = fs::read_to_string(&metadata_path)
         .with_context(|| format!("Failed to read metadata from {:?}", metadata_path))?;
 
-    let metadata: PRDMetadata = serde_json::from_str(&content)
-        .context("Failed to parse metadata JSON")?;
+    let metadata: PRDMetadata =
+        serde_json::from_str(&content).context("Failed to parse metadata JSON")?;
 
     Ok(Some(metadata))
 }

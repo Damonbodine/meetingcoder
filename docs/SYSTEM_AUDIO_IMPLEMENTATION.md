@@ -73,6 +73,8 @@ Added interactive testing features:
    - Check both "BlackHole 2ch" and your speakers
    - Right-click Multi-Output Device → "Use This Device For Sound Output"
 
+   > **Free volume control tip:** Install the open-source [Background Music](https://github.com/kyleneideck/BackgroundMusic) utility (`brew install --cask background-music`). It mirrors audio to your headphones while keeping BlackHole selected, so you regain per-app volume sliders without purchasing Loopback.
+
 ### Testing Steps
 
 1. **Run the app**:

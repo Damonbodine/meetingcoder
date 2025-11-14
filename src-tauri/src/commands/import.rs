@@ -2,17 +2,17 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use tauri::{AppHandle, Manager, State, Emitter};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::audio_toolkit::audio::load_audio_file_to_mono_16k;
+use crate::audio_toolkit::vad::{SileroVad, SmoothedVad, VadFrame, VoiceActivityDetector};
 use crate::automation::claude_trigger::trigger_meeting_update;
 use crate::managers::meeting::{MeetingManager, TranscriptSegment};
+use crate::managers::model::{EngineType, ModelManager};
 use crate::managers::transcription::TranscriptionManager;
 use crate::meeting::context_writer::append_update;
 use crate::settings;
 use crate::summarization::agent::summarize_segments_with_context;
-use crate::audio_toolkit::vad::{SileroVad, SmoothedVad, VoiceActivityDetector, VadFrame};
-use crate::managers::model::{ModelManager, EngineType};
 use tauri::path::BaseDirectory;
 
 #[derive(serde::Serialize, Clone)]
@@ -22,11 +22,70 @@ struct ImportProgress<'a> {
     percent: Option<u8>,
 }
 
+#[derive(serde::Serialize, Clone, Debug)]
+pub struct ToolStatus {
+    installed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+#[derive(serde::Serialize, Clone, Debug)]
+pub struct ImportToolStatus {
+    offline_mode: bool,
+    yt_dlp: ToolStatus,
+    ffmpeg: ToolStatus,
+}
+
 fn emit_progress(app: &AppHandle, stage: &str, percent: Option<u8>) {
-    let _ = app.emit(
-        "import-progress",
-        ImportProgress { stage, percent },
-    );
+    let _ = app.emit("import-progress", ImportProgress { stage, percent });
+}
+
+fn detect_tool(binary: &str, args: &[&str]) -> ToolStatus {
+    match std::process::Command::new(binary).args(args).output() {
+        Ok(output) => {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let version_line = stdout.lines().next().unwrap_or_default().trim().to_string();
+                ToolStatus {
+                    installed: true,
+                    version: if version_line.is_empty() {
+                        None
+                    } else {
+                        Some(version_line)
+                    },
+                    error: None,
+                }
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                ToolStatus {
+                    installed: false,
+                    version: None,
+                    error: Some(if stderr.is_empty() {
+                        "Command returned non-zero exit status".to_string()
+                    } else {
+                        stderr
+                    }),
+                }
+            }
+        }
+        Err(e) => ToolStatus {
+            installed: false,
+            version: None,
+            error: Some(e.to_string()),
+        },
+    }
+}
+
+#[tauri::command]
+pub async fn get_import_tool_status(app: AppHandle) -> Result<ImportToolStatus, String> {
+    let settings_now = settings::get_settings(&app);
+    Ok(ImportToolStatus {
+        offline_mode: settings_now.offline_mode_enabled,
+        yt_dlp: detect_tool("yt-dlp", &["--version"]),
+        ffmpeg: detect_tool("ffmpeg", &["-version"]),
+    })
 }
 
 /// Native file picker for audio files via Rust dialog plugin.
@@ -40,7 +99,8 @@ pub async fn pick_audio_file(app: AppHandle) -> Result<Option<String>, String> {
         .add_filter(
             "Audio",
             &[
-                "wav", "mp3", "m4a", "ogg", "flac", "aac", "mp4", "m4b", "webm", "opus", "oga", "weba", "aiff", "aif", "caf"
+                "wav", "mp3", "m4a", "ogg", "flac", "aac", "mp4", "m4b", "webm", "opus", "oga",
+                "weba", "aiff", "aif", "caf",
             ],
         )
         .blocking_pick_file();
@@ -50,8 +110,23 @@ pub async fn pick_audio_file(app: AppHandle) -> Result<Option<String>, String> {
 fn is_supported_audio_extension(path: &PathBuf) -> bool {
     if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
         let ext = ext.to_ascii_lowercase();
-        matches!(ext.as_str(),
-            "wav" | "mp3" | "m4a" | "ogg" | "flac" | "aac" | "mp4" | "m4b" | "webm" | "opus" | "oga" | "weba" | "aiff" | "aif" | "caf"
+        matches!(
+            ext.as_str(),
+            "wav"
+                | "mp3"
+                | "m4a"
+                | "ogg"
+                | "flac"
+                | "aac"
+                | "mp4"
+                | "m4b"
+                | "webm"
+                | "opus"
+                | "oga"
+                | "weba"
+                | "aiff"
+                | "aif"
+                | "caf"
         )
     } else {
         false
@@ -132,7 +207,10 @@ async fn import_audio_from_path_as_meeting(
             emit_progress(&app, "loading-model", Some(((waited * 100) / 30) as u8));
         }
         if !transcription_manager.is_model_loaded() {
-            return Err("Transcription model not loaded. Open Model Selector and download/select a model.".to_string());
+            return Err(
+                "Transcription model not loaded. Open Model Selector and download/select a model."
+                    .to_string(),
+            );
         }
     }
 
@@ -141,12 +219,19 @@ async fn import_audio_from_path_as_meeting(
     let decode_wall = std::time::Instant::now();
     let samples = load_audio_file_to_mono_16k(path).map_err(|e| e.to_string())?;
     if samples.is_empty() {
-        return Err("Audio decode produced zero samples. The file may be corrupt or unsupported.".to_string());
+        return Err(
+            "Audio decode produced zero samples. The file may be corrupt or unsupported."
+                .to_string(),
+        );
     }
     // Opportunistic ffmpeg fallback: if container is MP4/M4A/AAC/WEBM and length < 2 minutes, and setting enabled
     let mut samples = samples; // make mutable
     if settings_now.ffmpeg_fallback_for_imports {
-        if let Some(ext) = Path::new(&file_path).extension().and_then(|e| e.to_str()).map(|s| s.to_ascii_lowercase()) {
+        if let Some(ext) = Path::new(&file_path)
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|s| s.to_ascii_lowercase())
+        {
             let is_problematic_container = matches!(ext.as_str(), "mp4" | "m4a" | "aac" | "webm");
             let short_threshold = 16_000usize * 60 * 2; // 2 minutes
             if is_problematic_container && samples.len() < short_threshold {
@@ -208,11 +293,30 @@ async fn import_audio_from_path_as_meeting(
             last_end = last_end.max(*e);
             let dur = (*e as f64 - *s as f64) / 16_000f64;
             lens.push(dur);
-            log::debug!("segment {}: start={:.2}s end={:.2}s dur={:.2}s", n, (*s as f64)/16_000f64, (*e as f64)/16_000f64, dur);
+            log::debug!(
+                "segment {}: start={:.2}s end={:.2}s dur={:.2}s",
+                n,
+                (*s as f64) / 16_000f64,
+                (*e as f64) / 16_000f64,
+                dur
+            );
         }
-        lens.sort_by(|a,b| a.partial_cmp(b).unwrap());
-        let mean = if !lens.is_empty() { lens.iter().sum::<f64>() / lens.len() as f64 } else { 0.0 };
-        let median = if !lens.is_empty() { let mid = lens.len()/2; if lens.len()%2==0 {(lens[mid-1]+lens[mid])/2.0} else { lens[mid] } } else { 0.0 };
+        lens.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let mean = if !lens.is_empty() {
+            lens.iter().sum::<f64>() / lens.len() as f64
+        } else {
+            0.0
+        };
+        let median = if !lens.is_empty() {
+            let mid = lens.len() / 2;
+            if lens.len() % 2 == 0 {
+                (lens[mid - 1] + lens[mid]) / 2.0
+            } else {
+                lens[mid]
+            }
+        } else {
+            0.0
+        };
         log::info!("Import segments: count={}, mean_len={:.2}s, median_len={:.2}s, last_end={:.2}s, total={:.2}s",
             n, mean, median, (last_end as f64)/16_000f64, total_secs);
     }
@@ -233,7 +337,9 @@ async fn import_audio_from_path_as_meeting(
 
     // Helper to trim overlapping text at segment joins (UTF-8 safe)
     fn trim_overlap(prev: &str, cur: &str) -> String {
-        if prev.is_empty() || cur.is_empty() { return cur.to_string(); }
+        if prev.is_empty() || cur.is_empty() {
+            return cur.to_string();
+        }
         let prev_chars: Vec<char> = prev.chars().collect();
         let tail_start = prev_chars.len().saturating_sub(200);
         let prev_tail: String = prev_chars[tail_start..].iter().collect();
@@ -243,7 +349,10 @@ async fn import_audio_from_path_as_meeting(
         let mut best = 0usize;
         for k in (10..=max_check).rev() {
             let prefix: String = cur_chars[..k].iter().collect();
-            if prev_tail.ends_with(&prefix) { best = k; break; }
+            if prev_tail.ends_with(&prefix) {
+                best = k;
+                break;
+            }
         }
         cur_chars[best..].iter().collect()
     }
@@ -285,10 +394,15 @@ async fn import_audio_from_path_as_meeting(
             let final_text = if let Some(prev) = segments_accum.last() {
                 let trimmed = trim_overlap(&prev.text, &text);
                 if trimmed.len() < text.len() {
-                    log::debug!("Trimmed {} overlapping chars at segment join", text.len() - trimmed.len());
+                    log::debug!(
+                        "Trimmed {} overlapping chars at segment join",
+                        text.len() - trimmed.len()
+                    );
                 }
                 trimmed
-            } else { text.clone() };
+            } else {
+                text.clone()
+            };
             let seg = TranscriptSegment {
                 speaker: "Speaker 1".to_string(),
                 start_time,
@@ -312,12 +426,8 @@ async fn import_audio_from_path_as_meeting(
                 let start = sent_last_update_idx;
                 let end = full_transcript.len().saturating_sub(1);
                 if end >= start {
-                    let summary = summarize_segments_with_context(
-                        Some(pp),
-                        &full_transcript,
-                        start,
-                        end,
-                    );
+                    let summary =
+                        summarize_segments_with_context(Some(pp), &full_transcript, start, end);
                     if let Ok(update_id) = append_update(
                         pp,
                         &meeting_id,
@@ -337,7 +447,21 @@ async fn import_audio_from_path_as_meeting(
                 }
             }
         }
+    }
 
+    if total_wall_sec_transcribing > 0.0 {
+        let avg_rtf = total_audio_sec_processed / total_wall_sec_transcribing;
+        log::info!(
+            "Import transcription totals: audio_sec={:.2}, wall_sec={:.2}, avg_rtf={:.2}x",
+            total_audio_sec_processed,
+            total_wall_sec_transcribing,
+            avg_rtf
+        );
+    } else if total_audio_sec_processed > 0.0 {
+        log::info!(
+            "Import transcription totals: audio_sec={:.2}, wall_sec=0.0 (no timing captured)",
+            total_audio_sec_processed
+        );
     }
 
     emit_progress(&app, "finalizing", Some(100));
@@ -359,7 +483,11 @@ async fn import_audio_from_path_as_meeting(
         .map_err(|e| e.to_string())
 }
 
-fn build_fixed_segments_with_overlap(total: usize, chunk_seconds: u32, overlap_seconds: f64) -> Vec<(usize, usize)> {
+fn build_fixed_segments_with_overlap(
+    total: usize,
+    chunk_seconds: u32,
+    overlap_seconds: f64,
+) -> Vec<(usize, usize)> {
     // Favor longer chunks for better context.
     let chunk_seconds = (chunk_seconds.max(20).min(60)) as usize;
     let chunk_len = 16_000usize * chunk_seconds;
@@ -378,7 +506,11 @@ fn build_fixed_segments_with_overlap(total: usize, chunk_seconds: u32, overlap_s
         }
         if end_idx >= overlap_samples {
             let next = end_idx - overlap_samples;
-            start_idx_global = if next > start_idx_global { next } else { end_idx };
+            start_idx_global = if next > start_idx_global {
+                next
+            } else {
+                end_idx
+            };
         } else {
             start_idx_global = end_idx;
         }
@@ -386,13 +518,20 @@ fn build_fixed_segments_with_overlap(total: usize, chunk_seconds: u32, overlap_s
     v
 }
 
-fn build_vad_segments(app: &AppHandle, samples: &[f32], min_segment_seconds: u32) -> Result<Vec<(usize, usize)>, String> {
+fn build_vad_segments(
+    app: &AppHandle,
+    samples: &[f32],
+    min_segment_seconds: u32,
+) -> Result<Vec<(usize, usize)>, String> {
     let vad_path = app
         .path()
-        .resolve("resources/models/silero_vad_v4.onnx", BaseDirectory::Resource)
+        .resolve(
+            "resources/models/silero_vad_v4.onnx",
+            BaseDirectory::Resource,
+        )
         .map_err(|e| format!("Failed to resolve VAD path: {}", e))?;
     let inner = SileroVad::new(&vad_path, 0.4).map_err(|e| e.to_string())?; // slightly more permissive
-    // Smooth parameters: prefill=10 (~300ms), hangover=12 (~360ms), onset=3 (~90ms)
+                                                                            // Smooth parameters: prefill=10 (~300ms), hangover=12 (~360ms), onset=3 (~90ms)
     let mut vad = SmoothedVad::new(Box::new(inner), 10, 12, 3);
 
     let frame_len = 480usize; // 30 ms @ 16k
@@ -437,9 +576,12 @@ fn build_vad_segments(app: &AppHandle, samples: &[f32], min_segment_seconds: u32
     // Merge tiny gaps and clamp
     let mut merged: Vec<(usize, usize)> = Vec::new();
     for (s, e) in segments.into_iter() {
-        if s >= e { continue; }
+        if s >= e {
+            continue;
+        }
         if let Some((_ps, pe)) = merged.last_mut() {
-            if s.saturating_sub(*pe) < 1600 { // merge small gaps (<0.1s)
+            if s.saturating_sub(*pe) < 1600 {
+                // merge small gaps (<0.1s)
                 *pe = (*pe).max(e);
                 continue;
             }
@@ -466,14 +608,37 @@ fn build_vad_segments(app: &AppHandle, samples: &[f32], min_segment_seconds: u32
             acc_end = e;
         }
     }
-    if let Some(st) = acc_start { compact.push((st, acc_end)); }
+    if let Some(st) = acc_start {
+        compact.push((st, acc_end));
+    }
 
     // Summary log for VAD segmentation (post-compaction)
-    let mut lens: Vec<f64> = compact.iter().map(|(s,e)| ((*e as f64 - *s as f64) / 16_000f64)).collect();
-    lens.sort_by(|a,b| a.partial_cmp(b).unwrap());
-    let mean = if !lens.is_empty() { lens.iter().sum::<f64>() / lens.len() as f64 } else { 0.0 };
-    let median = if !lens.is_empty() { let mid = lens.len()/2; if lens.len()%2==0 {(lens[mid-1]+lens[mid])/2.0} else { lens[mid] } } else { 0.0 };
-    log::info!("VAD segments: count={}, mean_len={:.2}s, median_len={:.2}s", compact.len(), mean, median);
+    let mut lens: Vec<f64> = compact
+        .iter()
+        .map(|(s, e)| ((*e as f64 - *s as f64) / 16_000f64))
+        .collect();
+    lens.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let mean = if !lens.is_empty() {
+        lens.iter().sum::<f64>() / lens.len() as f64
+    } else {
+        0.0
+    };
+    let median = if !lens.is_empty() {
+        let mid = lens.len() / 2;
+        if lens.len() % 2 == 0 {
+            (lens[mid - 1] + lens[mid]) / 2.0
+        } else {
+            lens[mid]
+        }
+    } else {
+        0.0
+    };
+    log::info!(
+        "VAD segments: count={}, mean_len={:.2}s, median_len={:.2}s",
+        compact.len(),
+        mean,
+        median
+    );
     Ok(compact)
 }
 
@@ -513,14 +678,20 @@ fn ffmpeg_decode_to_mono_16k_pcm(src: &Path) -> Result<Vec<f32>, String> {
     match status {
         Ok(output) => {
             if !output.status.success() {
-                return Err(format!("ffmpeg returned error code: {:?}", output.status.code()));
+                return Err(format!(
+                    "ffmpeg returned error code: {:?}",
+                    output.status.code()
+                ));
             }
             // Read WAV via hound
             match hound::WavReader::open(&tmp) {
                 Ok(mut reader) => {
                     let spec = reader.spec();
                     if spec.sample_rate != 16_000 {
-                        log::warn!("ffmpeg wav sample_rate={} (expected 16000)", spec.sample_rate);
+                        log::warn!(
+                            "ffmpeg wav sample_rate={} (expected 16000)",
+                            spec.sample_rate
+                        );
                     }
                     // Support only PCM 16 here (we forced pcm_s16le above)
                     for s in reader.samples::<i16>() {
@@ -574,16 +745,29 @@ pub async fn import_youtube_as_meeting(
     // Indicate start of YouTube flow
     emit_progress(&app, "downloading", Some(0));
 
+    if settings::get_settings(&app).offline_mode_enabled {
+        return Err("Offline mode is enabled. Disable it to import from YouTube.".to_string());
+    }
+
     // Check yt-dlp availability explicitly to return a clean error if missing
-    match std::process::Command::new("yt-dlp").arg("--version").output() {
+    match std::process::Command::new("yt-dlp")
+        .arg("--version")
+        .output()
+    {
         Ok(out) => {
             if !out.status.success() {
-                return Err("yt-dlp not found. Please install yt-dlp and ensure it is on your PATH.".to_string());
+                return Err(
+                    "yt-dlp not found. Please install yt-dlp and ensure it is on your PATH."
+                        .to_string(),
+                );
             }
         }
         Err(e) => {
             if e.kind() == std::io::ErrorKind::NotFound {
-                return Err("yt-dlp not found. Please install yt-dlp and ensure it is on your PATH.".to_string());
+                return Err(
+                    "yt-dlp not found. Please install yt-dlp and ensure it is on your PATH."
+                        .to_string(),
+                );
             }
             return Err(format!("Failed to check yt-dlp availability: {}", e));
         }

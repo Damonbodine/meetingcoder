@@ -30,7 +30,9 @@ impl SpscRingBuffer {
     }
 
     #[inline]
-    pub fn capacity(&self) -> usize { self.cap }
+    pub fn capacity(&self) -> usize {
+        self.cap
+    }
 
     /// Returns the current number of samples available to read.
     #[inline]
@@ -49,7 +51,9 @@ impl SpscRingBuffer {
     /// Push samples into the ring buffer, overwriting oldest when full.
     /// Single producer only.
     pub fn push(&self, samples: &[f32]) {
-        if samples.is_empty() { return; }
+        if samples.is_empty() {
+            return;
+        }
 
         let cap = self.cap;
         // Fast path: if incoming larger than capacity, only keep the last `cap` samples
@@ -90,11 +94,7 @@ impl SpscRingBuffer {
             let dst_ptr = self.buf.as_ptr() as *mut f32;
             std::ptr::copy_nonoverlapping(src.as_ptr(), dst_ptr.add(write_index), first);
             if to_write > first {
-                std::ptr::copy_nonoverlapping(
-                    src.as_ptr().add(first),
-                    dst_ptr,
-                    to_write - first,
-                );
+                std::ptr::copy_nonoverlapping(src.as_ptr().add(first), dst_ptr, to_write - first);
             }
         }
 
@@ -104,14 +104,18 @@ impl SpscRingBuffer {
 
     /// Drain up to n samples from the ring into a Vec. Single consumer only.
     pub fn drain_n(&self, n: usize) -> Vec<f32> {
-        if n == 0 { return Vec::new(); }
+        if n == 0 {
+            return Vec::new();
+        }
 
         let cap = self.cap;
         let head = self.head.load(Ordering::Acquire);
         let tail = self.tail.load(Ordering::Relaxed);
         let available = head.saturating_sub(tail).min(cap);
         let to_read = available.min(n);
-        if to_read == 0 { return Vec::new(); }
+        if to_read == 0 {
+            return Vec::new();
+        }
 
         let mut out = vec![0.0f32; to_read];
         let read_index = tail % cap;
@@ -135,4 +139,3 @@ impl SpscRingBuffer {
         out
     }
 }
-

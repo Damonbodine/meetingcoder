@@ -5,7 +5,9 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 use crate::actions::ACTION_MAP;
 use crate::settings::ShortcutBinding;
-use crate::settings::{self, get_settings, ClipboardHandling, OverlayPosition, PasteMethod, SoundTheme};
+use crate::settings::{
+    self, get_settings, ClipboardHandling, OverlayPosition, PasteMethod, SoundTheme,
+};
 use crate::ManagedToggleState;
 
 pub fn init_shortcuts(app: &AppHandle) {
@@ -227,6 +229,36 @@ pub fn change_debug_mode_setting(app: AppHandle, enabled: bool) -> Result<(), St
 }
 
 #[tauri::command]
+pub fn change_advanced_features_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.advanced_features_enabled = enabled;
+    settings::write_settings(&app, settings);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({
+            "setting": "advanced_features_enabled",
+            "value": enabled
+        }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn change_offline_mode_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.offline_mode_enabled = enabled;
+    settings::write_settings(&app, settings);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({
+            "setting": "offline_mode_enabled",
+            "value": enabled
+        }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
 pub fn change_start_hidden_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.start_hidden = enabled;
@@ -312,7 +344,10 @@ pub fn change_clipboard_handling_setting(app: AppHandle, handling: String) -> Re
         "dont_modify" => ClipboardHandling::DontModify,
         "copy_to_clipboard" => ClipboardHandling::CopyToClipboard,
         other => {
-            eprintln!("Invalid clipboard handling '{}', defaulting to dont_modify", other);
+            eprintln!(
+                "Invalid clipboard handling '{}', defaulting to dont_modify",
+                other
+            );
             ClipboardHandling::DontModify
         }
     };
@@ -378,7 +413,9 @@ pub fn change_system_audio_buffer_seconds_setting(
     settings::write_settings(&app, s.clone());
 
     // Reconfigure buffer capacity via manager (restart if active)
-    if let Some(rm) = app.try_state::<std::sync::Arc<crate::managers::audio::AudioRecordingManager>>() {
+    if let Some(rm) =
+        app.try_state::<std::sync::Arc<crate::managers::audio::AudioRecordingManager>>()
+    {
         if let Err(e) = rm.reconfigure_system_audio_buffer(value) {
             eprintln!("Failed to reconfigure system audio buffer: {}", e);
         }
@@ -441,10 +478,7 @@ pub fn change_github_repo_owner_setting(
 }
 
 #[tauri::command]
-pub fn change_github_repo_name_setting(
-    app: AppHandle,
-    name: Option<String>,
-) -> Result<(), String> {
+pub fn change_github_repo_name_setting(app: AppHandle, name: Option<String>) -> Result<(), String> {
     let mut s = settings::get_settings(&app);
     s.github_repo_name = name.clone();
     settings::write_settings(&app, s);
@@ -456,10 +490,7 @@ pub fn change_github_repo_name_setting(
 }
 
 #[tauri::command]
-pub fn change_github_default_branch_setting(
-    app: AppHandle,
-    branch: String,
-) -> Result<(), String> {
+pub fn change_github_default_branch_setting(app: AppHandle, branch: String) -> Result<(), String> {
     let mut s = settings::get_settings(&app);
     s.github_default_branch = branch.clone();
     settings::write_settings(&app, s);
@@ -471,10 +502,7 @@ pub fn change_github_default_branch_setting(
 }
 
 #[tauri::command]
-pub fn change_github_branch_pattern_setting(
-    app: AppHandle,
-    pattern: String,
-) -> Result<(), String> {
+pub fn change_github_branch_pattern_setting(app: AppHandle, pattern: String) -> Result<(), String> {
     let mut s = settings::get_settings(&app);
     s.github_branch_pattern = pattern.clone();
     settings::write_settings(&app, s);
@@ -486,10 +514,7 @@ pub fn change_github_branch_pattern_setting(
 }
 
 #[tauri::command]
-pub fn change_github_enabled_setting(
-    app: AppHandle,
-    enabled: bool,
-) -> Result<(), String> {
+pub fn change_github_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut s = settings::get_settings(&app);
     s.github_enabled = enabled;
     settings::write_settings(&app, s);

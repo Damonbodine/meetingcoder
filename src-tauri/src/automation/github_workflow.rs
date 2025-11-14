@@ -37,6 +37,12 @@ pub async fn auto_create_branch(
     let settings = settings::get_settings(app);
 
     // Only proceed if GitHub is enabled
+    if !settings.advanced_features_enabled {
+        return Err(anyhow!("Advanced Automations disabled"));
+    }
+    if settings.offline_mode_enabled {
+        return Err(anyhow!("Offline mode enabled"));
+    }
     if !settings.github_enabled {
         return Err(anyhow!("GitHub integration not enabled"));
     }
@@ -52,19 +58,15 @@ pub async fn auto_create_branch(
         .ok_or_else(|| anyhow!("GitHub repository name not set"))?;
 
     // Get token
-    let _token = github::get_github_token()
-        .map_err(|e| anyhow!("No GitHub token: {}", e))?;
+    let _token = github::get_github_token().map_err(|e| anyhow!("No GitHub token: {}", e))?;
 
     // Initialize or open repo
     let repo_obj = github::init_git_repo(project_path)
         .map_err(|e| anyhow!("Failed to init git repo: {}", e))?;
 
     // Generate branch name
-    let branch_name = github::generate_branch_name(
-        &settings.github_branch_pattern,
-        meeting_id,
-        meeting_name,
-    );
+    let branch_name =
+        github::generate_branch_name(&settings.github_branch_pattern, meeting_id, meeting_name);
 
     // Check if we're on the default branch
     let current_branch = github::get_current_branch(&repo_obj).unwrap_or_default();
@@ -119,6 +121,12 @@ pub async fn auto_commit_and_push(
     let settings = settings::get_settings(app);
 
     // Check if auto-commit-push is enabled
+    if !settings.advanced_features_enabled {
+        return Err(anyhow!("Advanced Automations disabled"));
+    }
+    if settings.offline_mode_enabled {
+        return Err(anyhow!("Offline mode enabled"));
+    }
     if !settings.github_enabled || !settings.github_auto_commit_push {
         return Err(anyhow!("GitHub auto-commit-push not enabled"));
     }
@@ -134,19 +142,15 @@ pub async fn auto_commit_and_push(
         .ok_or_else(|| anyhow!("GitHub repository name not set"))?;
 
     // Get token
-    let token = github::get_github_token()
-        .map_err(|e| anyhow!("No GitHub token: {}", e))?;
+    let token = github::get_github_token().map_err(|e| anyhow!("No GitHub token: {}", e))?;
 
     // Initialize repo
     let repo_obj = github::init_git_repo(project_path)
         .map_err(|e| anyhow!("Failed to init git repo: {}", e))?;
 
     // Generate branch name
-    let branch_name = github::generate_branch_name(
-        &settings.github_branch_pattern,
-        meeting_id,
-        meeting_name,
-    );
+    let branch_name =
+        github::generate_branch_name(&settings.github_branch_pattern, meeting_id, meeting_name);
 
     // Check current branch
     let current_branch = github::get_current_branch(&repo_obj).unwrap_or_default();
@@ -166,12 +170,16 @@ pub async fn auto_commit_and_push(
     // Commit meeting files
     let commit_message = format!(
         "Update meeting: {} (update #{})\n\nAutomatically generated from Handy meeting session.",
-        meeting_name,
-        update_id
+        meeting_name, update_id
     );
 
-    github::commit_meeting_files(&repo_obj, &commit_message, "Handy", "noreply@handy.computer")
-        .map_err(|e| anyhow!("Failed to commit: {}", e))?;
+    github::commit_meeting_files(
+        &repo_obj,
+        &commit_message,
+        "Handy",
+        "noreply@handy.computer",
+    )
+    .map_err(|e| anyhow!("Failed to commit: {}", e))?;
 
     // Push to remote
     github::push_to_remote(project_path, &branch_name, &token, owner, repo)
@@ -204,6 +212,12 @@ pub async fn auto_create_or_update_pr(
     let settings = settings::get_settings(app);
 
     // Check if auto-PR is enabled
+    if !settings.advanced_features_enabled {
+        return Err(anyhow!("Advanced Automations disabled"));
+    }
+    if settings.offline_mode_enabled {
+        return Err(anyhow!("Offline mode enabled"));
+    }
     if !settings.github_enabled {
         return Err(anyhow!("GitHub integration not enabled"));
     }
@@ -227,18 +241,14 @@ pub async fn auto_create_or_update_pr(
         .ok_or_else(|| anyhow!("GitHub repository name not set"))?;
 
     // Get token
-    let token = github::get_github_token()
-        .map_err(|e| anyhow!("No GitHub token: {}", e))?;
+    let token = github::get_github_token().map_err(|e| anyhow!("No GitHub token: {}", e))?;
 
     // Read GitHub state
     let github_state = github::read_github_state(project_path);
 
     // Generate branch name
-    let branch_name = github::generate_branch_name(
-        &settings.github_branch_pattern,
-        meeting_id,
-        meeting_name,
-    );
+    let branch_name =
+        github::generate_branch_name(&settings.github_branch_pattern, meeting_id, meeting_name);
 
     // Read meeting updates to build PR body
     let updates = read_meeting_updates(project_path)?;

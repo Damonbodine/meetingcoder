@@ -25,6 +25,13 @@ function App() {
     checkOnboardingStatus();
   }, []);
 
+  useEffect(() => {
+    const config = SECTIONS_CONFIG[currentSection];
+    if (config && !config.enabled(settings)) {
+      setCurrentSection("general");
+    }
+  }, [currentSection, settings]);
+
   // Handle keyboard shortcuts for debug mode toggle
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {

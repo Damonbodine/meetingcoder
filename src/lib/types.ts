@@ -59,6 +59,8 @@ export const SettingsSchema = z.object({
   selected_language: z.string(),
   overlay_position: OverlayPositionSchema,
   debug_mode: z.boolean(),
+  advanced_features_enabled: z.boolean().optional().default(false),
+  offline_mode_enabled: z.boolean().optional().default(false),
   custom_words: z.array(z.string()).optional().default([]),
   model_unload_timeout: ModelUnloadTimeoutSchema.optional().default("never"),
   word_correction_threshold: z.number().optional().default(0.18),
@@ -217,6 +219,21 @@ export const PRResultSchema = z.object({
 });
 
 export type PRResult = z.infer<typeof PRResultSchema>;
+
+export const ToolStatusSchema = z.object({
+  installed: z.boolean(),
+  version: z.string().nullable().optional(),
+  error: z.string().nullable().optional(),
+});
+
+export const ImportToolStatusSchema = z.object({
+  offline_mode: z.boolean(),
+  yt_dlp: ToolStatusSchema,
+  ffmpeg: ToolStatusSchema,
+});
+
+export type ToolStatus = z.infer<typeof ToolStatusSchema>;
+export type ImportToolStatus = z.infer<typeof ImportToolStatusSchema>;
 
 export const RepoInfoSchema = z.object({
   id: z.number(),

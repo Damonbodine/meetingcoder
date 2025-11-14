@@ -19,7 +19,10 @@ pub fn render_prd_markdown(
         "**Segment Range**: {}-{} of {}\n",
         version.segment_range.0, version.segment_range.1, version.total_segments
     ));
-    md.push_str(&format!("**Confidence**: {:.0}%\n", version.confidence * 100.0));
+    md.push_str(&format!(
+        "**Confidence**: {:.0}%\n",
+        version.confidence * 100.0
+    ));
     md.push_str("\n---\n\n");
 
     // Executive Summary
@@ -46,10 +49,7 @@ pub fn render_prd_markdown(
                 .collect();
 
             if !stories.is_empty() {
-                md.push_str(&format!(
-                    "### Priority: {}\n\n",
-                    capitalize(priority)
-                ));
+                md.push_str(&format!("### Priority: {}\n\n", capitalize(priority)));
 
                 for story in stories {
                     md.push_str(&format!("**{}**: ", story.id));
@@ -124,8 +124,7 @@ pub fn render_prd_markdown(
                 .non_functional_requirements
                 .iter()
                 .filter(|r| {
-                    r.category.as_ref().map(|c| c.to_lowercase())
-                        == Some(category.to_lowercase())
+                    r.category.as_ref().map(|c| c.to_lowercase()) == Some(category.to_lowercase())
                 })
                 .collect();
 
@@ -223,7 +222,11 @@ pub fn render_prd_markdown(
                         dep.id,
                         dep.name,
                         dep.description,
-                        if dep.blocking { "⚠️ (Blocking)" } else { "" }
+                        if dep.blocking {
+                            "⚠️ (Blocking)"
+                        } else {
+                            ""
+                        }
                     ));
                 }
                 md.push_str("\n");
