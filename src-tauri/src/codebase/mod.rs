@@ -1,5 +1,6 @@
 pub mod analyzer;
 pub mod isolation;
+pub mod semantic;
 
 pub use analyzer::{
     analyze_and_save_codebase, analyze_codebase, save_manifest_to_state, CodebaseManifest,

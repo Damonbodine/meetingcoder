@@ -19,6 +19,7 @@ mod summarization;
 mod system_audio;
 mod tray;
 mod utils;
+mod agent;
 mod workers;
 
 use managers::audio::AudioRecordingManager;
@@ -26,6 +27,8 @@ use managers::history::HistoryManager;
 use managers::meeting::MeetingManager;
 use managers::model::ModelManager;
 use managers::transcription::TranscriptionManager;
+use managers::plan::PlanManager;
+use managers::memory::MemoryManager;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tauri::image::Image;
@@ -86,6 +89,8 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         )
         .expect("Failed to initialize meeting manager"),
     );
+    let plan_manager = Arc::new(PlanManager::new(app_handle));
+    let memory_manager = Arc::new(MemoryManager::new(app_handle).expect("Failed to initialize memory manager"));
 
     // Initialize durable audio queue and ASR worker(s)
     let queue = queue::Queue::new(app_handle).expect("Failed to initialize audio queue");
@@ -108,6 +113,8 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(transcription_manager.clone());
     app_handle.manage(history_manager.clone());
     app_handle.manage(meeting_manager.clone());
+    app_handle.manage(plan_manager.clone());
+    app_handle.manage(memory_manager.clone());
 
     // Initialize the shortcuts
     shortcut::init_shortcuts(app_handle);
@@ -178,12 +185,45 @@ fn initialize_core_logic(app_handle: &AppHandle) {
 
     // Create the recording overlay window (hidden by default)
     utils::create_recording_overlay(app_handle);
+
+    // Start VS Code Server
+    let vscode_server = crate::integrations::vscode::VSCodeServer::new(app_handle.clone());
+    vscode_server.start();
+
+    // Start Suggestion Engine
+    let suggestion_engine = crate::agent::suggestion_engine::SuggestionEngine::new(app_handle.clone(), memory_manager.clone());
+    app_handle.manage(suggestion_engine.clone());
+    suggestion_engine.start();
 }
 
 #[tauri::command]
 fn trigger_update_check(app: AppHandle) -> Result<(), String> {
     app.emit("check-for-updates", ())
         .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn speak_suggestion(text: String, persona_role: String) -> Result<(), String> {
+    let voice = crate::agent::tts::TTSEngine::get_persona_voice(&persona_role);
+    crate::agent::tts::TTSEngine::speak(&text, Some(voice))
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn set_meeting_mode(
+    engine: tauri::State<'_, crate::agent::suggestion_engine::SuggestionEngine>,
+    mode: String
+) -> Result<(), String> {
+    let mode_enum = match mode.as_str() {
+        "Discovery" => crate::agent::suggestion_engine::MeetingMode::Discovery,
+        "Technical" => crate::agent::suggestion_engine::MeetingMode::Technical,
+        "Review" => crate::agent::suggestion_engine::MeetingMode::Review,
+        _ => return Err("Invalid mode".to_string()),
+    };
+    
+    engine.set_mode(mode_enum).await;
     Ok(())
 }
 
@@ -389,7 +429,10 @@ pub fn run() {
             commands::prd::get_prd_change,
             commands::prd::export_prd,
             commands::prd::get_prd_metadata,
-            commands::prd::delete_prd_version
+            commands::prd::delete_prd_version,
+            toggle_recording,
+            speak_suggestion,
+            set_meeting_mode
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

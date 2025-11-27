@@ -51,12 +51,41 @@ struct ClaudeRequest {
     messages: Vec<ClaudeMessage>,
     #[serde(skip_serializing_if = "Option::is_none")]
     system: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    tools: Vec<ToolDefinition>,
 }
 
 #[derive(Debug, Serialize)]
-struct ClaudeMessage {
-    role: String, // "user" or "assistant"
-    content: String,
+struct ToolDefinition {
+    name: String,
+    description: String,
+    input_schema: serde_json::Value,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ClaudeMessage {
+    pub role: String, // "user" or "assistant"
+    pub content: Vec<ClaudeContent>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(tag = "type")]
+pub enum ClaudeContent {
+    #[serde(rename = "text")]
+    Text { text: String },
+    #[serde(rename = "tool_use")]
+    ToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
+    #[serde(rename = "tool_result")]
+    ToolResult {
+        tool_use_id: String,
+        content: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        is_error: Option<bool>,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -66,50 +95,22 @@ struct ClaudeResponse {
     stop_reason: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-struct ClaudeContent {
-    #[serde(rename = "type")]
-    content_type: String,
-    text: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ExtractionResult {
-    pub new_features: Vec<ExtractedFeature>,
-    pub technical_decisions: Vec<String>,
-    pub questions: Vec<String>,
-    #[serde(default)]
-    pub project_type: Option<String>,
-    #[serde(default)]
-    pub target_files: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ExtractedFeature {
-    pub title: String,
-    pub description: String,
-    pub priority: String, // "high", "medium", "low"
-    #[serde(default)]
-    pub confidence: f64,
-}
-
 // ===== Claude API Client =====
 
 pub async fn call_claude_api(
     model: &str,
     system_prompt: &str,
-    user_prompt: &str,
-) -> Result<String> {
+    messages: Vec<ClaudeMessage>,
+    tools: Vec<ToolDefinition>,
+) -> Result<ClaudeMessage> {
     let api_key = get_api_key()?;
 
     let request = ClaudeRequest {
         model: model.to_string(),
         max_tokens: 4096,
-        messages: vec![ClaudeMessage {
-            role: "user".to_string(),
-            content: user_prompt.to_string(),
-        }],
+        messages,
         system: Some(system_prompt.to_string()),
+        tools,
     };
 
     let client = reqwest::Client::new();
@@ -134,14 +135,35 @@ pub async fn call_claude_api(
         .await
         .map_err(|e| anyhow!("Failed to parse Claude API response: {}", e))?;
 
-    // Extract text from first content block
-    let text = claude_response
-        .content
-        .first()
-        .map(|c| c.text.clone())
-        .ok_or_else(|| anyhow!("No content in Claude API response"))?;
+    Ok(ClaudeMessage {
+        role: "assistant".to_string(),
+        content: claude_response.content,
+    })
+}
 
-    Ok(text)
+// Helper for simple text-only prompts (backward compatibility)
+pub async fn call_claude_api_text(
+    model: &str,
+    system_prompt: &str,
+    user_prompt: &str,
+) -> Result<String> {
+    let messages = vec![ClaudeMessage {
+        role: "user".to_string(),
+        content: vec![ClaudeContent::Text {
+            text: user_prompt.to_string(),
+        }],
+    }];
+    
+    let response = call_claude_api(model, system_prompt, messages, vec![]).await?;
+    
+    // Extract text from first content block
+    response.content
+        .iter()
+        .find_map(|c| match c {
+            ClaudeContent::Text { text } => Some(text.clone()),
+            _ => None,
+        })
+        .ok_or_else(|| anyhow!("No text content in Claude API response"))
 }
 
 // ===== Prompt Templates =====
@@ -252,7 +274,8 @@ pub async fn summarize_with_llm(
     let user_prompt = build_extraction_prompt(&transcript_text, is_first_update);
 
     log::info!("Calling Claude API for summarization...");
-    let response_text = call_claude_api(model, system_prompt, &user_prompt).await?;
+    log::info!("Calling Claude API for summarization...");
+    let response_text = call_claude_api_text(model, system_prompt, &user_prompt).await?;
 
     log::debug!("Claude API response: {}", response_text);
 
