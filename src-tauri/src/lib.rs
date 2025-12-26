@@ -66,25 +66,57 @@ fn show_main_window(app: &AppHandle) {
 }
 
 fn initialize_core_logic(app_handle: &AppHandle) {
-    // First, initialize the managers
-    let recording_manager = Arc::new(
-        AudioRecordingManager::new(app_handle).expect("Failed to initialize recording manager"),
-    );
-    let model_manager =
-        Arc::new(ModelManager::new(app_handle).expect("Failed to initialize model manager"));
-    let transcription_manager = Arc::new(
-        TranscriptionManager::new(app_handle, model_manager.clone())
-            .expect("Failed to initialize transcription manager"),
-    );
-    let history_manager =
-        Arc::new(HistoryManager::new(app_handle).expect("Failed to initialize history manager"));
-    let meeting_manager = Arc::new(
-        MeetingManager::new(app_handle, recording_manager.clone(), transcription_manager.clone())
-            .expect("Failed to initialize meeting manager"),
-    );
+    // First, initialize the managers with proper error handling
+    let recording_manager = match AudioRecordingManager::new(app_handle) {
+        Ok(manager) => Arc::new(manager),
+        Err(e) => {
+            eprintln!("CRITICAL: Failed to initialize recording manager: {}", e);
+            eprintln!("The application may not function correctly without audio recording.");
+            // Try to continue with a minimal setup - the app can still show UI
+            panic!("Cannot start without audio recording manager: {}", e);
+        }
+    };
+
+    let model_manager = match ModelManager::new(app_handle) {
+        Ok(manager) => Arc::new(manager),
+        Err(e) => {
+            eprintln!("CRITICAL: Failed to initialize model manager: {}", e);
+            panic!("Cannot start without model manager: {}", e);
+        }
+    };
+
+    let transcription_manager = match TranscriptionManager::new(app_handle, model_manager.clone()) {
+        Ok(manager) => Arc::new(manager),
+        Err(e) => {
+            eprintln!("CRITICAL: Failed to initialize transcription manager: {}", e);
+            panic!("Cannot start without transcription manager: {}", e);
+        }
+    };
+
+    let history_manager = match HistoryManager::new(app_handle) {
+        Ok(manager) => Arc::new(manager),
+        Err(e) => {
+            eprintln!("CRITICAL: Failed to initialize history manager: {}", e);
+            panic!("Cannot start without history manager: {}", e);
+        }
+    };
+
+    let meeting_manager = match MeetingManager::new(app_handle, recording_manager.clone(), transcription_manager.clone()) {
+        Ok(manager) => Arc::new(manager),
+        Err(e) => {
+            eprintln!("CRITICAL: Failed to initialize meeting manager: {}", e);
+            panic!("Cannot start without meeting manager: {}", e);
+        }
+    };
 
     // Initialize durable audio queue and ASR worker(s)
-    let queue = queue::Queue::new(app_handle).expect("Failed to initialize audio queue");
+    let queue = match queue::Queue::new(app_handle) {
+        Ok(q) => q,
+        Err(e) => {
+            eprintln!("CRITICAL: Failed to initialize audio queue: {}", e);
+            panic!("Cannot start without audio queue: {}", e);
+        }
+    };
     app_handle.manage(queue.clone());
     let worker_count = settings::get_settings(app_handle).queue_worker_count.clamp(1, 8);
     for _ in 0..worker_count {
@@ -115,16 +147,33 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     // Choose the appropriate initial icon based on theme
     let initial_icon_path = tray::get_icon_path(initial_theme, tray::TrayIconState::Idle);
 
+    // Safely resolve tray icon path with error handling
+    let tray_icon_path = match app_handle
+        .path()
+        .resolve(initial_icon_path, tauri::path::BaseDirectory::Resource)
+    {
+        Ok(path) => path,
+        Err(e) => {
+            eprintln!("Failed to resolve tray icon path: {}. Using fallback.", e);
+            // Try a fallback path
+            app_handle
+                .path()
+                .resolve("resources/handy.png", tauri::path::BaseDirectory::Resource)
+                .expect("Failed to resolve fallback tray icon path")
+        }
+    };
+
+    let tray_icon = match Image::from_path(&tray_icon_path) {
+        Ok(icon) => icon,
+        Err(e) => {
+            eprintln!("Failed to load tray icon from {:?}: {}", tray_icon_path, e);
+            // This is a critical failure - the app needs a tray icon
+            panic!("Cannot start application without tray icon. Please ensure resources are properly bundled.");
+        }
+    };
+
     let tray = TrayIconBuilder::new()
-        .icon(
-            Image::from_path(
-                app_handle
-                    .path()
-                    .resolve(initial_icon_path, tauri::path::BaseDirectory::Resource)
-                    .unwrap(),
-            )
-            .unwrap(),
-        )
+        .icon(tray_icon)
         .show_menu_on_left_click(true)
         .icon_as_template(true)
         .on_menu_event(|app, event| match event.id.as_ref() {
@@ -147,7 +196,7 @@ fn initialize_core_logic(app_handle: &AppHandle) {
             _ => {}
         })
         .build(app_handle)
-        .unwrap();
+        .expect("Failed to build tray icon");
     app_handle.manage(tray);
 
     // Initialize tray menu with idle state

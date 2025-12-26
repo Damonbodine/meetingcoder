@@ -19,20 +19,28 @@ const OVERLAY_BOTTOM_OFFSET: f64 = 15.0;
 const OVERLAY_BOTTOM_OFFSET: f64 = 40.0;
 
 fn get_monitor_with_cursor(app_handle: &AppHandle) -> Option<tauri::Monitor> {
-    let enigo = Enigo::new(&Default::default());
-    if let Ok(enigo) = enigo {
-        if let Ok(mouse_location) = enigo.location() {
-            if let Ok(monitors) = app_handle.available_monitors() {
-                for monitor in monitors {
-                    let is_within = is_mouse_within_monitor(mouse_location, monitor.position(), monitor.size());
-                    if is_within {
-                        return Some(monitor);
+    // Try to get the monitor containing the cursor using Enigo
+    // Enigo may fail on macOS without accessibility permissions - handle gracefully
+    match Enigo::new(&Default::default()) {
+        Ok(enigo) => {
+            if let Ok(mouse_location) = enigo.location() {
+                if let Ok(monitors) = app_handle.available_monitors() {
+                    for monitor in monitors {
+                        let is_within = is_mouse_within_monitor(mouse_location, monitor.position(), monitor.size());
+                        if is_within {
+                            return Some(monitor);
+                        }
                     }
                 }
             }
         }
+        Err(e) => {
+            // Log the error but don't crash - this commonly fails without accessibility permissions
+            debug!("Enigo initialization failed (accessibility permissions may be needed): {:?}", e);
+        }
     }
 
+    // Fallback to primary monitor
     app_handle.primary_monitor().ok().flatten()
 }
 

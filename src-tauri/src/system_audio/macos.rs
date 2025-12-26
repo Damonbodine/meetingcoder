@@ -292,7 +292,20 @@ impl MacOSSystemAudio {
 
 impl Default for MacOSSystemAudio {
     fn default() -> Self {
-        Self::new().expect("Failed to create MacOSSystemAudio")
+        match Self::new() {
+            Ok(audio) => audio,
+            Err(e) => {
+                eprintln!("Warning: Failed to create MacOSSystemAudio: {}. System audio capture will be unavailable.", e);
+                // Create a minimal non-functional instance rather than panicking
+                Self {
+                    host: cpal::default_host(),
+                    stream: std::sync::Arc::new(std::sync::Mutex::new(None)),
+                    is_capturing: std::sync::Arc::new(std::sync::Mutex::new(false)),
+                    current_device: std::sync::Arc::new(std::sync::Mutex::new(None)),
+                    sample_rate: std::sync::Arc::new(std::sync::Mutex::new(16000)),
+                }
+            }
+        }
     }
 }
 

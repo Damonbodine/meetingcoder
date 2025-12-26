@@ -60,14 +60,24 @@ pub fn change_tray_icon(app: &AppHandle, icon: TrayIconState) {
 
     let icon_path = get_icon_path(theme, icon.clone());
 
-    let _ = tray.set_icon(Some(
-        Image::from_path(
-            app.path()
-                .resolve(icon_path, tauri::path::BaseDirectory::Resource)
-                .expect("failed to resolve"),
-        )
-        .expect("failed to set icon"),
-    ));
+    // Safely resolve and load the icon
+    let resolved_path = match app.path().resolve(icon_path, tauri::path::BaseDirectory::Resource) {
+        Ok(path) => path,
+        Err(e) => {
+            eprintln!("Failed to resolve tray icon path '{}': {}", icon_path, e);
+            return;
+        }
+    };
+
+    let image = match Image::from_path(&resolved_path) {
+        Ok(img) => img,
+        Err(e) => {
+            eprintln!("Failed to load tray icon from {:?}: {}", resolved_path, e);
+            return;
+        }
+    };
+
+    let _ = tray.set_icon(Some(image));
 
     // Update menu based on state
     update_tray_menu(app, &icon);
