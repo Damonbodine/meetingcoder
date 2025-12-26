@@ -396,7 +396,9 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
                 let default_settings = get_default_settings();
 
                 // Store the default settings
-                store.set("settings", serde_json::to_value(&default_settings).unwrap());
+                if let Ok(value) = serde_json::to_value(&default_settings) {
+                    store.set("settings", value);
+                }
 
                 default_settings
             }
@@ -406,7 +408,9 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
         let default_settings = get_default_settings();
 
         // Store the settings
-        store.set("settings", serde_json::to_value(&default_settings).unwrap());
+        if let Ok(value) = serde_json::to_value(&default_settings) {
+            store.set("settings", value);
+        }
 
         default_settings
     };
@@ -432,7 +436,11 @@ pub fn write_settings(app: &AppHandle, settings: AppSettings) {
         .store(SETTINGS_STORE_PATH)
         .expect("Failed to initialize store");
 
-    store.set("settings", serde_json::to_value(&settings).unwrap());
+    if let Ok(value) = serde_json::to_value(&settings) {
+        store.set("settings", value);
+    } else {
+        log::error!("Failed to serialize settings");
+    }
 }
 
 pub fn get_bindings(app: &AppHandle) -> HashMap<String, ShortcutBinding> {
@@ -444,9 +452,13 @@ pub fn get_bindings(app: &AppHandle) -> HashMap<String, ShortcutBinding> {
 pub fn get_stored_binding(app: &AppHandle, id: &str) -> ShortcutBinding {
     let bindings = get_bindings(app);
 
-    let binding = bindings.get(id).unwrap().clone();
-
-    binding
+    bindings.get(id).cloned().unwrap_or_else(|| ShortcutBinding {
+        id: id.to_string(),
+        name: "Unknown".to_string(),
+        description: "Unknown binding".to_string(),
+        default_binding: String::new(),
+        current_binding: String::new(),
+    })
 }
 
 pub fn get_history_limit(app: &AppHandle) -> usize {

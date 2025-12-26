@@ -435,8 +435,8 @@ fn format_segment_list(segments: &[usize]) -> String {
     } else {
         format!(
             "#{}-#{} ({} total)",
-            segments.first().unwrap(),
-            segments.last().unwrap(),
+            segments.first().copied().unwrap_or(0),
+            segments.last().copied().unwrap_or(0),
             segments.len()
         )
     }

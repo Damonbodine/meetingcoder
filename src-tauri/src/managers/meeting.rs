@@ -150,8 +150,8 @@ impl MeetingManager {
             && settings.github_repo_owner.is_some()
             && settings.github_repo_name.is_some()
         {
-            let owner = settings.github_repo_owner.clone().unwrap();
-            let repo = settings.github_repo_name.clone().unwrap();
+            let owner = settings.github_repo_owner.clone().unwrap_or_default();
+            let repo = settings.github_repo_name.clone().unwrap_or_default();
             match github::get_github_token()
                 .and_then(|token| github::ensure_local_repo_clone(&owner, &repo, &token))
             {
@@ -330,8 +330,8 @@ impl MeetingManager {
             && settings.github_repo_owner.is_some()
             && settings.github_repo_name.is_some()
         {
-            let owner = settings.github_repo_owner.clone().unwrap();
-            let repo = settings.github_repo_name.clone().unwrap();
+            let owner = settings.github_repo_owner.clone().unwrap_or_default();
+            let repo = settings.github_repo_name.clone().unwrap_or_default();
             match crate::integrations::github::get_github_token()
                 .and_then(|token| crate::integrations::github::ensure_local_repo_clone(&owner, &repo, &token))
             {

@@ -5,7 +5,7 @@ use std::process::Command;
 use std::fs;
 use std::env;
 
-const KEYCHAIN_SERVICE: &str = "com.handy.github";
+const KEYCHAIN_SERVICE: &str = "com.meetingcoder.github";
 const KEYCHAIN_ACCOUNT: &str = "github_token";
 
 // Fallback token storage path for when keyring fails (development mode)
@@ -101,6 +101,71 @@ pub fn write_github_state(project_path: &str, state: &GitHubState) -> Result<()>
     Ok(())
 }
 
+/// Create a temporary credential helper script that provides the token securely
+/// Returns the path to the helper script (caller must clean up)
+fn create_git_credential_helper(token: &str) -> Result<std::path::PathBuf> {
+    let temp_dir = std::env::temp_dir();
+    let helper_path = temp_dir.join(format!(".git-credential-helper-{}", std::process::id()));
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        // Create script that outputs credentials
+        let script = format!(
+            "#!/bin/sh\necho 'username=x-access-token'\necho 'password={}'\n",
+            token
+        );
+        fs::write(&helper_path, script)?;
+        // Make executable (owner only for security)
+        fs::set_permissions(&helper_path, std::fs::Permissions::from_mode(0o700))?;
+    }
+
+    #[cfg(windows)]
+    {
+        // On Windows, create a batch file
+        let script = format!(
+            "@echo off\necho username=x-access-token\necho password={}\n",
+            token
+        );
+        let bat_path = helper_path.with_extension("bat");
+        fs::write(&bat_path, script)?;
+        return Ok(bat_path);
+    }
+
+    Ok(helper_path)
+}
+
+/// Run a git command with secure token authentication
+fn run_git_with_token(
+    args: &[&str],
+    working_dir: Option<&Path>,
+    token: &str,
+) -> Result<std::process::Output> {
+    let helper_path = create_git_credential_helper(token)?;
+
+    let mut cmd = Command::new("git");
+
+    // Configure git to use our credential helper
+    cmd.arg("-c")
+        .arg(format!("credential.helper={}", helper_path.display()));
+
+    // Add the actual git command arguments
+    for arg in args {
+        cmd.arg(arg);
+    }
+
+    if let Some(dir) = working_dir {
+        cmd.current_dir(dir);
+    }
+
+    let output = cmd.output()?;
+
+    // Clean up the temporary helper script
+    let _ = fs::remove_file(&helper_path);
+
+    Ok(output)
+}
+
 /// Ensure a local clone of the selected GitHub repository exists and return its path
 /// Layout: ~/MeetingCoder/repos/{owner}/{repo}
 pub fn ensure_local_repo_clone(owner: &str, repo: &str, token: &str) -> Result<String> {
@@ -115,13 +180,16 @@ pub fn ensure_local_repo_clone(owner: &str, repo: &str, token: &str) -> Result<S
         return Ok(dest.to_string_lossy().to_string());
     }
 
-    // Clone using token in URL for simplicity (dev mode); production should rely on keychain/credential helper
-    let remote_url = format!("https://{}@github.com/{}/{}.git", token, owner, repo);
-    let output = Command::new("git")
-        .arg("clone")
-        .arg(&remote_url)
-        .arg(&dest)
-        .output()?;
+    // Clone using secure credential helper (token never appears in command line)
+    let remote_url = format!("https://github.com/{}/{}.git", owner, repo);
+    let dest_str = dest.to_string_lossy();
+
+    let output = run_git_with_token(
+        &["clone", &remote_url, &dest_str],
+        None,
+        token,
+    )?;
+
     if !output.status.success() {
         return Err(anyhow!(
             "Git clone failed: {}",
@@ -410,7 +478,7 @@ pub fn commit_meeting_files(
     Ok(oid)
 }
 
-/// Push branch to remote using git command (libgit2 auth can be complex)
+/// Push branch to remote using git command with secure authentication
 pub fn push_to_remote(
     project_path: &str,
     branch_name: &str,
@@ -418,20 +486,16 @@ pub fn push_to_remote(
     owner: &str,
     repo: &str,
 ) -> Result<()> {
-    // Set up remote URL with token authentication
-    let remote_url = format!(
-        "https://{}@github.com/{}/{}.git",
-        token, owner, repo
-    );
+    // Use HTTPS URL without embedded token (credential helper provides auth)
+    let remote_url = format!("https://github.com/{}/{}.git", owner, repo);
+    let refspec = format!("{}:{}", branch_name, branch_name);
 
-    // Use git command for push (simpler authentication)
-    let output = Command::new("git")
-        .current_dir(project_path)
-        .arg("push")
-        .arg(&remote_url)
-        .arg(format!("{}:{}", branch_name, branch_name))
-        .arg("--set-upstream")
-        .output()?;
+    // Use secure credential helper instead of embedding token in URL
+    let output = run_git_with_token(
+        &["push", &remote_url, &refspec, "--set-upstream"],
+        Some(Path::new(project_path)),
+        token,
+    )?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

@@ -280,7 +280,7 @@ impl PRDGenerator {
         // Analyze changes if there was a previous version
         if let Some(prev_content) = previous_content {
             let mut change = analyze_changes(&prev_content, &final_content);
-            change.from_version = self.versions.last().unwrap().version;
+            change.from_version = self.versions.last().map(|v| v.version).unwrap_or(0);
             change.to_version = version_number;
 
             let mut changelog = load_changelog(&self.meeting_id)?;
