@@ -1,146 +1,131 @@
-# Handy
+# MeetingCoder
 
-[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/invite/WVBeWsNXK4)
-
-**A free, open source, and extensible speech-to-text application that works completely offline.**
-
-Handy is a cross-platform desktop application built with Tauri (Rust + React/TypeScript) that provides simple, privacy-focused speech transcription. Press a shortcut, speak, and have your words appear in any text field—all without sending your voice to the cloud.
-
-## Why Handy?
-
-Handy was created to fill the gap for a truly open source, extensible speech-to-text tool. As stated on [handy.computer](https://handy.computer):
-
-- **Free**: Accessibility tooling belongs in everyone's hands, not behind a paywall
-- **Open Source**: Together we can build further. Extend Handy for yourself and contribute to something bigger
-- **Private**: Your voice stays on your computer. Get transcriptions without sending audio to the cloud
-- **Simple**: One tool, one job. Transcribe what you say and put it into a text box
-
-Handy isn't trying to be the best speech-to-text app—it's trying to be the most forkable one.
-
-## How It Works
-
-1. **Press** a configurable keyboard shortcut to start/stop recording (or use push-to-talk mode)
-2. **Speak** your words while the shortcut is active
-3. **Release** and Handy processes your speech using Whisper
-4. **Get** your transcribed text pasted directly into whatever app you're using
-
-The process is entirely local:
-- Silence is filtered using VAD (Voice Activity Detection) with Silero
-- Transcription uses your choice of models:
-  - **Whisper models** (Small/Medium/Turbo/Large) with GPU acceleration when available
-  - **Parakeet V3** - CPU-optimized model with excellent performance and automatic language detection
-- Works on Windows, macOS, and Linux
-
-## Quick Start
-
-### Installation
-
-1. Download the latest release from the [releases page](https://github.com/cjpais/Handy/releases) or the [website](https://handy.computer)
-2. Install the application following platform-specific instructions
-3. Launch Handy and grant necessary system permissions (microphone, accessibility)
-4. Configure your preferred keyboard shortcuts in Settings
-5. Start transcribing!
-
-### Development Setup
-
-For detailed build instructions including platform-specific requirements, see [BUILD.md](BUILD.md).
-
-### Import Audio/YouTube into MeetingCoder
-
-- Import a local file: Open Meetings → "Import Audio into MeetingCoder", enter a meeting name, and choose an audio file (wav/mp3/m4a/ogg/flac).
-- Import a YouTube URL: Paste the URL and click Import. Requires `yt-dlp` on PATH (macOS: `brew install yt-dlp`).
-- The app creates a transcript and appends `.meeting-updates.jsonl`; automation can run if enabled.
-
-## Architecture
-
-Handy is built as a Tauri application combining:
-
-- **Frontend**: React + TypeScript with Tailwind CSS for the settings UI
-- **Backend**: Rust for system integration, audio processing, and ML inference
-- **Core Libraries**:
-  - `whisper-rs`: Local speech recognition with Whisper models
-  - `transcription-rs`: CPU-optimized speech recognition with Parakeet models
-  - `cpal`: Cross-platform audio I/O
-  - `vad-rs`: Voice Activity Detection
-  - `rdev`: Global keyboard shortcuts and system events
-  - `rubato`: Audio resampling
-
-### Debug Mode
-
-Handy includes an advanced debug mode for development and troubleshooting. Access it by pressing:
-- **macOS**: `Cmd+Shift+D`
-- **Windows/Linux**: `Ctrl+Shift+D`
-
-## Known Issues & Current Limitations
-
-This project is actively being developed and has some [known issues](https://github.com/cjpais/Handy/issues). We believe in transparency about the current state:
-
-### Platform Support
-- **macOS (both Intel and Apple Silicon)**
-- **x64 Windows**
-- **x64 Linux**
-
-### System Requirements/Recommendations
-
-The following are recommendations for running Handy on your own machine. If you don't meet the system requirements, the performance of the application may be degraded. We are working on improving the performance across all kinds of computers and hardware.
-
-**For Whisper Models:**
-- **macOS**: M series Mac, Intel Mac
-- **Windows**: Intel, AMD, or NVIDIA GPU
-- **Linux**: Intel, AMD, or NVIDIA GPU
-  * Ubuntu 22.04, 24.04
-
-**For Parakeet V3 Model:**
-- **CPU-only operation** - runs on a wide variety of hardware
-- **Minimum**: Intel Skylake (6th gen) or equivalent AMD processors
-- **Performance**: ~5x real-time speed on mid-range hardware (tested on i5)
-- **Automatic language detection** - no manual language selection required
-
-### How to Contribute
-
-1. **Check existing issues** at [github.com/cjpais/Handy/issues](https://github.com/cjpais/Handy/issues)
-2. **Fork the repository** and create a feature branch
-3. **Test thoroughly** on your target platform
-4. **Submit a pull request** with clear description of changes
-5. **Join the discussion** - reach out at [contact@handy.computer](mailto:contact@handy.computer)
-
-The goal is to create both a useful tool and a foundation for others to build upon—a well-patterned, simple codebase that serves the community.
-
-## Sponsors
-
-<div align="center">
-  We're grateful for the support of our sponsors who help make Handy possible:
-  <br><br>
-  <a href="https://wordcab.com">
-    <img src="sponsor-images/wordcab.png" alt="Wordcab" width="120" height="120">
-  </a>
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/epicenter-so/epicenter">
-    <img src="sponsor-images/epicenter.png" alt="Epicenter" width="120" height="120">
-  </a>
-</div>
-
-## Related Projects
-
-- **[Handy CLI](https://github.com/cjpais/handy-cli)** - The original Python command-line version
-- **[handy.computer](https://handy.computer)** - Project website with demos and documentation
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- **Whisper** by OpenAI for the speech recognition model
-- **whisper.cpp and ggml** for amazing cross-platform whisper inference/acceleration
-- **Silero** for great lightweight VAD
-- **Tauri** team for the excellent Rust-based app framework
-- **Community contributors** helping make Handy better
+> **Transform meetings into working code.**
+> Desktop app for real-time meeting transcription with system audio capture and AI-powered code generation. Built with Tauri (Rust + React/TypeScript).
 
 ---
 
-*"Your search for the right speech-to-text tool can end here—not because Handy is perfect, but because you can make it perfect for you."*
-## Project Phases
+## Credit & relationship to Handy
 
-- Phase 1: System audio capture and continuous transcription foundations
-- Phase 6: Import audio and YouTube into MeetingCoder (see `docs/prd/06-PHASE6.md`)
+**MeetingCoder is built on top of [Handy](https://github.com/cjpais/Handy)** by [@cjpais](https://github.com/cjpais), with all of Handy's core speech-to-text infrastructure preserved. If you want a privacy-focused, offline speech-to-text utility, **use Handy** — it's the canonical project.
+
+This repository extends Handy with meeting-centric features: persistent meeting history, GitHub repo integration, AI-driven summarization, PRD generation from transcripts, and audio import. The MeetingCoder layer is research-grade — Handy is the production-grade thing.
+
+If you contribute improvements to the underlying transcription/audio pipeline, please send the PR to [`cjpais/Handy`](https://github.com/cjpais/Handy) so the broader community benefits.
+
+---
+
+## What MeetingCoder adds on top of Handy
+
+| Capability | Where it lives |
+|---|---|
+| **Meeting history & persistent transcripts** | `src/components/Sidebar.tsx`, `src/components/onboarding/`, on-disk `.meeting-updates.jsonl` |
+| **System audio capture** (record both mic and speaker output) | `SYSTEM_AUDIO_IMPLEMENTATION.md` documents the approach |
+| **Audio file & YouTube URL import** | Backed by `yt-dlp` (must be on PATH for YouTube) |
+| **AI summarization of transcripts** | `summarization/` modules |
+| **Document generation (PRDs from meetings)** | `document_generation/prd_generator/` |
+| **Codebase awareness** (link a transcript to a repo for context) | `codebase/` Rust modules |
+| **GitHub integration** (link meetings to repos / issues) | Consolidated GitHub integration commit |
+| **Automation rules** that fire on meeting events | `.meeting-updates.jsonl` event stream |
+
+For a granular changelog of the MeetingCoder additions specifically, see [CHANGELOG.md](./CHANGELOG.md) and the `feat: complete MeetingCoder implementation` commits in the history.
+
+---
+
+## Quick start
+
+> ⚠️ **First-time setup is non-trivial.** Read [BUILD.md](./BUILD.md) before attempting. macOS Sonoma users may hit a CMake version error — the workaround is in BUILD.md.
+
+```bash
+# Prerequisites: Rust (stable), Bun
+bun install
+
+# Download the required VAD model (one-time)
+mkdir -p src-tauri/resources/models
+curl -o src-tauri/resources/models/silero_vad_v4.onnx \
+  https://blob.handy.computer/silero_vad_v4.onnx
+
+# Run in dev mode
+bun run tauri dev
+# If CMake errors on macOS:
+CMAKE_POLICY_VERSION_MINIMUM=3.5 bun run tauri dev
+
+# Build for production
+bun run tauri build
+```
+
+For YouTube import, install `yt-dlp`:
+```bash
+brew install yt-dlp     # macOS
+```
+
+---
+
+## Architecture (inherited from Handy)
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Frontend      │    │    Backend      │    │   ML Models     │
+│  React + TS     │◄──►│   Rust + Tauri  │◄──►│ Whisper / VAD   │
+│   Vite          │    │   Audio I/O     │    │   Silero        │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+**Core libraries (from Handy):**
+- `whisper-rs` — local Whisper inference (GPU when available)
+- `transcription-rs` — Parakeet V3 (CPU-optimized)
+- `cpal` — cross-platform audio I/O
+- `vad-rs` — voice activity detection
+- `rdev` — global keyboard shortcuts
+- `rubato` — audio resampling
+
+**MeetingCoder additions:**
+- `summarization/` — meeting summary agent
+- `document_generation/` — PRD generation pipeline
+- `codebase/` — repo indexing for context-aware code generation
+
+---
+
+## How it works
+
+1. **Press** the configurable shortcut to start recording (or use push-to-talk)
+2. **Speak** through the meeting; both mic and system audio are captured
+3. **Release** — Whisper transcribes locally, no audio leaves your machine
+4. **Review** the transcript in the meeting history view
+5. **Generate** — kick off summarization, PRD generation, or code suggestions tied to a linked repo
+
+The transcription stage is entirely local (Handy's design). The MeetingCoder generation features call out to LLM APIs you configure.
+
+---
+
+## Platform support
+
+Inherited from Handy:
+- ✅ **macOS** (Intel + Apple Silicon)
+- ✅ **x64 Windows**
+- ⚠️ **Linux** — community-supported
+
+System audio capture is platform-specific; see [SYSTEM_AUDIO_IMPLEMENTATION.md](./SYSTEM_AUDIO_IMPLEMENTATION.md) for current state.
+
+---
+
+## Status & maintenance
+
+This is a **research project**, not a maintained product. It demonstrates a particular architecture (local STT + cloud LLM hybrid for meeting workflows) but I am not actively shipping releases or accepting bug reports here.
+
+If you want a production-ready local STT tool, **[install Handy](https://handy.computer)** instead.
+
+If you want to extend MeetingCoder for your own use, fork freely under the existing license.
+
+---
+
+## License
+
+Same as Handy — see [LICENSE](./LICENSE).
+
+---
+
+## Links
+
+- **Handy upstream** (the foundation this is built on): [github.com/cjpais/Handy](https://github.com/cjpais/Handy) · [handy.computer](https://handy.computer)
+- **Damon Bodine** (MeetingCoder author): [damonbodine.vercel.app](https://damonbodine.vercel.app) · [GitHub](https://github.com/Damonbodine) · [LinkedIn](https://linkedin.com/in/damonbodine)
